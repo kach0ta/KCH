@@ -1,0 +1,14 @@
+.DS_Store
+Thumbs.db
+.gradle/
+build/
+dist/
+*.apk
+*.aab
+*.jks
+*.keystore
+.env
+.env.*
+!.env.example
+node_modules/
+.wrangler/
