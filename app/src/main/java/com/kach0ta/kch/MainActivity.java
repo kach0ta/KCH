@@ -43,10 +43,10 @@ public final class MainActivity extends Activity {
         root.addView(card("Приватные каналы", "Каналы, доступные только по приглашению"));
 
         add(root, label("РАЗРАБОТЧИКИ", 11, PURPLE, true), 34);
-        root.addView(developer("kach0ta", "Автор проекта"));
-        root.addView(developer("vo1dka", "Разработка и архитектура"));
-        root.addView(developer("r3z0n", "Разработка"));
-        root.addView(developer("a1r1s", "Разработка"));
+        root.addView(developer("kach0ta"));
+        root.addView(developer("vo1dka"));
+        root.addView(developer("r3z0n"));
+        root.addView(developer("a1r1s"));
 
         TextView footer = label("K.C.H.  •  FOUNDATION BUILD", 10, MUTED, false);
         footer.setGravity(Gravity.CENTER);
@@ -67,7 +67,7 @@ public final class MainActivity extends Activity {
         return box;
     }
 
-    private View developer(String name, String role) {
+    private View developer(String name) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(dp(14), dp(11), dp(14), dp(11));
@@ -76,7 +76,6 @@ public final class MainActivity extends Activity {
         p.topMargin = dp(7);
         box.setLayoutParams(p);
         box.addView(label(name, 15, Color.WHITE, true));
-        add(box, label(role, 11, MUTED, false), 3);
         return box;
     }
 
