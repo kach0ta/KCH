@@ -8,6 +8,13 @@ for tool in aapt javac d8 zip zipalign apksigner keytool; do
   command -v "$tool" >/dev/null 2>&1 || { echo "Missing tool: $tool"; exit 1; }
 done
 [ -f "$ANDROID_JAR" ] || { echo "android.jar not found: $ANDROID_JAR"; exit 1; }
+KEYSTORE_DIR="$HOME/.config/kch"
+KEYSTORE="$KEYSTORE_DIR/debug.keystore"
+mkdir -p "$KEYSTORE_DIR"
+# Preserve the existing local signing identity when upgrading from older project builds.
+if [ ! -f "$KEYSTORE" ] && [ -f "$BUILD/debug.keystore" ]; then
+  cp "$BUILD/debug.keystore" "$KEYSTORE"
+fi
 rm -rf "$BUILD"
 mkdir -p "$BUILD/classes" "$BUILD/dex" "$OUT"
 aapt package -f -M "$ROOT/app/src/main/AndroidManifest.xml" -I "$ANDROID_JAR" -F "$BUILD/base.apk"
@@ -21,7 +28,6 @@ d8 --min-api 23 --lib "$ANDROID_JAR" --output "$BUILD/dex" "${CLASS_FILES[@]}"
 cp "$BUILD/base.apk" "$BUILD/unsigned.apk"
 (cd "$BUILD/dex" && zip -q "$BUILD/unsigned.apk" classes.dex)
 zipalign -f 4 "$BUILD/unsigned.apk" "$BUILD/aligned.apk"
-KEYSTORE="$BUILD/debug.keystore"
 if [ ! -f "$KEYSTORE" ]; then
   keytool -genkeypair -keystore "$KEYSTORE" -storepass android -alias kchdebug -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=KCH Debug,O=Kach0ta,C=XX"
 fi
