@@ -2,10 +2,12 @@
 
 Android-first private messenger project.
 
-**Current state:** first foundation commit. The Android app is a native UI shell and the Cloudflare Worker is a health-check stub. This is not yet a working messaging service: authentication, end-to-end encryption, realtime delivery, attachments, and push notifications remain unimplemented.
+**Current state:** the Android app is an early native interface shell. The current screen is in Russian and lists the planned personal spaces. The developers are credited in the app: kach0ta, vo1dka, r3z0n, and a1r1s. The existing footer signature is intentionally kept unchanged.
+
+This is not yet a working messaging service. The Worker API has registration, login, conversation, and ciphertext-message endpoint foundations, but it still needs a configured Cloudflare D1 database and deployment. The Android client is not yet connected to those endpoints. Do not use it for real private conversations.
 
 ## Product decisions
-- Android first; Russian and English planned.
+- Android first; current interface language: Russian.
 - Black, purple, and acid-green visual identity.
 - Username + password accounts; no email registration.
 - 1:1 chats, groups, Favorites, and private channels.
@@ -22,7 +24,7 @@ Android-first private messenger project.
 - `scripts/` Termux build helper
 
 ## Build Android APK in Termux
-The script targets the lightweight Android SDK toolchain used in the project. It has not yet been verified on every device.
+Run from the repository root:
 
 ```sh
 chmod +x scripts/build-android.sh
@@ -31,5 +33,8 @@ chmod +x scripts/build-android.sh
 
 Requires `ANDROID_JAR` (defaults to the Termux android-34 path), `aapt`, `javac`, `d8`, `zip`, `zipalign`, `apksigner`, and `keytool` on PATH. Output: `dist/KCH-debug.apk`. The debug key is generated under ignored build output and must never be used as a production signing key.
 
+## Server boundary
+The backend cannot be used until a Cloudflare account is configured, a D1 database is created, its real database ID is placed in `backend/wrangler.toml`, migrations are applied, and the Worker is deployed. Those account-specific steps require the project owner to sign in and authorize access. Never commit API tokens or passwords.
+
 ## Security
-Never commit passwords, API tokens, private keys, keystores, production secrets, or real user data. A private repository is not a substitute for secret management. Do not invent cryptography; select a maintained, audited E2EE implementation before sending real messages.
+Never commit passwords, API tokens, private keys, keystores, production secrets, or real user data. A public repository is not a substitute for secret management. Do not invent cryptography; select a maintained, audited E2EE implementation before sending real messages.
