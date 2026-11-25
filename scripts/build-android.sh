@@ -12,7 +12,12 @@ rm -rf "$BUILD"
 mkdir -p "$BUILD/classes" "$BUILD/dex" "$OUT"
 aapt package -f -M "$ROOT/app/src/main/AndroidManifest.xml" -I "$ANDROID_JAR" -F "$BUILD/base.apk"
 javac -source 8 -target 8 -bootclasspath "$ANDROID_JAR" -d "$BUILD/classes" "$ROOT/app/src/main/java/com/kach0ta/kch/MainActivity.java"
-d8 --min-api 23 --lib "$ANDROID_JAR" --output "$BUILD/dex" "$BUILD/classes"
+mapfile -d '' CLASS_FILES < <(find "$BUILD/classes" -type f -name '*.class' -print0)
+if [ "${#CLASS_FILES[@]}" -eq 0 ]; then
+  echo "No compiled .class files found"
+  exit 1
+fi
+d8 --min-api 23 --lib "$ANDROID_JAR" --output "$BUILD/dex" "${CLASS_FILES[@]}"
 cp "$BUILD/base.apk" "$BUILD/unsigned.apk"
 (cd "$BUILD/dex" && zip -q "$BUILD/unsigned.apk" classes.dex)
 zipalign -f 4 "$BUILD/unsigned.apk" "$BUILD/aligned.apk"
