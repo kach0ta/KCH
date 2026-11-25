@@ -42,15 +42,14 @@ public final class MainActivity extends Activity {
         root.addView(card("Группы", "Здесь будут отображаться групповые беседы"));
         root.addView(card("Приватные каналы", "Каналы, доступные только по приглашению"));
 
-        add(root, label("РАЗРАБОТЧИКИ", 11, PURPLE, true), 34);
-        root.addView(developer("kach0ta"));
-        root.addView(developer("vo1dka"));
-        root.addView(developer("r3z0n"));
-        root.addView(developer("a1r1s"));
-
         TextView footer = label("K.C.H.  •  FOUNDATION BUILD", 10, MUTED, false);
         footer.setGravity(Gravity.CENTER);
         add(root, footer, 34);
+
+        TextView credits = label("kach0ta  ·  vo1dka  ·  r3z0n  ·  a1r1s", 8, Color.rgb(83, 78, 94), false);
+        credits.setGravity(Gravity.CENTER);
+        credits.setAlpha(0.55f);
+        add(root, credits, 12);
         setContentView(scroll);
     }
 
@@ -64,18 +63,6 @@ public final class MainActivity extends Activity {
         box.setLayoutParams(p);
         box.addView(label(title, 17, Color.WHITE, true));
         add(box, label(description, 12, MUTED, false), 5);
-        return box;
-    }
-
-    private View developer(String name) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(14), dp(11), dp(14), dp(11));
-        box.setBackgroundColor(PANEL);
-        LinearLayout.LayoutParams p = params();
-        p.topMargin = dp(7);
-        box.setLayoutParams(p);
-        box.addView(label(name, 15, Color.WHITE, true));
         return box;
     }
 
