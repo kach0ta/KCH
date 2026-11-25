@@ -21,24 +21,33 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
+
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22), dp(34), dp(22), dp(24));
+        root.setPadding(dp(22), dp(34), dp(22), dp(28));
         scroll.addView(root);
 
         root.addView(label("K.C.H.", 34, Color.WHITE, true));
         add(root, label("Kach0ta's Communication Hideout", 14, MUTED, false), 5);
-        add(root, label("PRIVATE MESSENGER // EARLY BUILD", 11, ACID, true), 34);
-        add(root, label("Your little corner of privacy.", 23, Color.WHITE, true), 12);
-        add(root, label("The interface foundation is running. Accounts, encrypted messaging, and server sync are still under development.", 15, MUTED, false), 10);
-        add(root, label("YOUR SPACE", 11, PURPLE, true), 38);
-        root.addView(card("Favorites", "A private space for notes to yourself"));
-        root.addView(card("Personal chats", "Your one-to-one conversations will appear here"));
-        root.addView(card("Groups", "Group conversations will appear here"));
-        root.addView(card("Private channels", "Invite-only channels will appear here"));
+        add(root, label("ЛИЧНЫЙ МЕССЕНДЖЕР // РАННЯЯ СБОРКА", 11, ACID, true), 34);
+        add(root, label("Твой уголок приватности.", 23, Color.WHITE, true), 12);
+        add(root, label("Основа интерфейса уже работает. Регистрация, переписка с шифрованием и синхронизация с сервером пока находятся в разработке.", 15, MUTED, false), 10);
+
+        add(root, label("ТВОЁ ПРОСТРАНСТВО", 11, PURPLE, true), 38);
+        root.addView(card("Избранное", "Личное пространство для заметок самому себе"));
+        root.addView(card("Личные чаты", "Здесь будут отображаться диалоги один на один"));
+        root.addView(card("Группы", "Здесь будут отображаться групповые беседы"));
+        root.addView(card("Приватные каналы", "Каналы, доступные только по приглашению"));
+
+        add(root, label("РАЗРАБОТЧИКИ", 11, PURPLE, true), 34);
+        root.addView(developer("kach0ta", "Автор проекта"));
+        root.addView(developer("vo1dka", "Разработка и архитектура"));
+        root.addView(developer("r3z0n", "Разработка"));
+        root.addView(developer("a1r1s", "Разработка"));
+
         TextView footer = label("K.C.H.  •  FOUNDATION BUILD", 10, MUTED, false);
         footer.setGravity(Gravity.CENTER);
         add(root, footer, 34);
@@ -55,6 +64,19 @@ public final class MainActivity extends Activity {
         box.setLayoutParams(p);
         box.addView(label(title, 17, Color.WHITE, true));
         add(box, label(description, 12, MUTED, false), 5);
+        return box;
+    }
+
+    private View developer(String name, String role) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(14), dp(11), dp(14), dp(11));
+        box.setBackgroundColor(PANEL);
+        LinearLayout.LayoutParams p = params();
+        p.topMargin = dp(7);
+        box.setLayoutParams(p);
+        box.addView(label(name, 15, Color.WHITE, true));
+        add(box, label(role, 11, MUTED, false), 3);
         return box;
     }
 
