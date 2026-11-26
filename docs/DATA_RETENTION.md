@@ -8,6 +8,7 @@ K.C.H. must retain only data needed to operate the service. Cleanup must never s
 
 - **Legacy avatars:** on backend startup, old plaintext `users.avatar_data` values are set to NULL. The API rejects new plaintext avatar uploads with `plaintext_avatar_disabled`.
 - **Encrypted avatars:** the profile record stores only an opaque ciphertext envelope, MIME hint, version and update timestamp. Replacing or clearing an avatar overwrites the previous database value; no avatar history is kept.
+- **Avatar key envelopes:** per-recipient encrypted key envelopes are retained only for the current avatar version. Replacing or clearing an avatar removes all envelopes for the previous version; recipients can fetch only their own envelope when they share a conversation with the owner.
 - **Message deletion:** `DELETE /v1/conversations/:conversationId/messages/:messageId` physically removes the message row. Only its sender may currently delete it. The conversation membership check is required first.
 - **Expired sessions:** expired authentication sessions are pruned every six hours.
 - **SQLite cleanup:** `secure_delete=ON` is enabled and a WAL truncate checkpoint is requested after destructive changes and scheduled cleanup.
