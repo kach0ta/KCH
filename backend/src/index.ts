@@ -20,7 +20,7 @@ async function current(r:Request,e:Env):Promise<User|null>{
 async function session(e:Env,id:string){const t=token();await e.DB.prepare("INSERT INTO sessions(id,user_id,token_hash,created_at,expires_at) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),id,await sha(t),now(),now()+2592000).run();return t;}
 export default { async fetch(r:Request,e:Env):Promise<Response>{
  const u=new URL(r.url), p=u.pathname;
- if(r.method==="GET"&&p==="/health")return out({ok:true,service:"kch-api"});
+ if(r.method==="GET"&&p==="/health")return out({ok:true,service:"kch-api",public:true});
  if(r.method==="POST"&&p==="/v1/auth/register"){
   const d=await data(r); if(!d||typeof d.username!=="string"||!/^[a-zA-Z0-9_]{3,24}$/.test(d.username)||typeof d.password!=="string"||d.password.length<10||d.password.length>128)return err("username must be 3-24 letters, digits or underscore; password 10-128 chars");
   const name=d.username.toLowerCase(); if(await e.DB.prepare("SELECT id FROM users WHERE username=?").bind(name).first())return err("username_taken",409);
