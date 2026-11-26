@@ -135,7 +135,9 @@ Implemented in this branch:
 - AES-256-GCM binary blob primitive;
 - P-256 ECDH and HKDF-SHA-256 platform primitives;
 - local P-256 ECDSA device identity key generation/signing through Android Keystore;
-- a manual Settings diagnostic that checks key creation/readback, valid signature verification and rejection of a modified signature. This diagnostic must still be run on a real device; source compilation alone is not a runtime test;
+- canonical identity-signed P-256 prekey bundle creation and verification;
+- experimental local signed-prekey persistence, with private key material encrypted at rest using the device-local Android Keystore AES-GCM key;
+- Settings diagnostics for device identity, signed-prekey tamper/expiry checks and local prekey persistence; these must be run on a real device and are not substitutes for protocol tests;
 - standalone primitive self-tests, successfully run in the owner's Termux environment;
 - server-side groundwork for opaque encrypted avatar ciphertext and recipient key-envelope records;
 - data-retention documentation and legacy plaintext-avatar rejection.
