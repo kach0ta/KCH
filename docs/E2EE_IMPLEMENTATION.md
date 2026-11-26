@@ -24,7 +24,7 @@ The app targets Android API 23. The first compatibility prototype uses:
 - HKDF-SHA-256 (RFC 5869);
 - AES-256-GCM for blob encryption.
 
-CryptoPrimitives.java currently provides ephemeral P-256 key generation, X.509 public-key encoding/decoding, ECDH and HKDF-SHA-256. EncryptedBlob.java provides a versioned AES-GCM envelope with a random 96-bit nonce, 128-bit authentication tag and context-bound AAD.
+CryptoPrimitives.java currently provides ephemeral P-256 key generation, X.509 public-key encoding/decoding, ECDH and HKDF-SHA-256. DeviceIdentity.java adds a per-installation P-256 ECDSA signing identity backed by Android Keystore, with public-key export, domain-separated signatures, signature verification and SHA-256 fingerprints. EncryptedBlob.java provides a versioned AES-GCM envelope with a random 96-bit nonce, 128-bit authentication tag and context-bound AAD.
 
 The standalone JVM tests were run by the project owner in Termux and passed:
 - RFC 5869 HKDF test case 1;
@@ -114,12 +114,13 @@ See DATA_RETENTION.md for server-side deletion behavior and its limitations.
 Implemented in this branch:
 - AES-256-GCM binary blob primitive;
 - P-256 ECDH and HKDF-SHA-256 platform primitives;
+- local P-256 ECDSA device identity key generation/signing through Android Keystore (not yet runtime-tested on a device);
 - standalone primitive self-tests, successfully run in the owner's Termux environment;
 - server-side groundwork for opaque encrypted avatar ciphertext and recipient key-envelope records;
 - data-retention documentation and legacy plaintext-avatar rejection.
 
 Not implemented:
-- device identity keys or identity verification;
+- contact identity verification UX or a trusted key directory;
 - signed/one-time prekeys or handshake endpoints;
 - authenticated sessions or a message ratchet;
 - encrypted chat UI or message send/receive integration;
