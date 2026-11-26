@@ -60,6 +60,17 @@ A future session setup needs:
 
 The exact handshake transcript, key schedule, failure handling and test vectors must be specified before implementation. Never trust an uploaded prekey merely because it came from the API.
 
+
+### Signed prekey bundle primitive (prototype)
+
+`SignedPreKeyBundle.java` adds an isolated building block for asynchronous session setup:
+- a P-256 public prekey is encoded in X.509 form;
+- a canonical, length-prefixed transcript binds protocol version, account ID, device ID, key ID, expiry and the exact public-key bytes;
+- the device identity key signs that transcript with the dedicated `SIGNED-PREKEY-V1` purpose;
+- verification checks expiry, P-256 encoding and the signature against a caller-supplied trusted identity public key.
+
+This does **not** provide a usable asynchronous handshake. The matching private prekey is not persisted by this class, the server has no prekey publication/consumption endpoints, no one-time prekeys are implemented, and identity trust still requires fingerprint verification. Do not upload or rely on these bundles in live chats yet. Before use, the API must enforce uniqueness, expiry, replacement and atomic one-time-prekey consumption.
+
 ### Per-message protection
 
 A live messaging protocol still needs a reviewed state machine for:
