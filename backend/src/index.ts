@@ -22,7 +22,7 @@ export default { async fetch(r:Request,e:Env):Promise<Response>{
  const u=new URL(r.url), p=u.pathname;
  if(r.method==="GET"&&p==="/health")return out({ok:true,service:"kch-api",public:true});
  if(r.method==="POST"&&p==="/v1/auth/register"){
-  const d=await data(r); if(!d||typeof d.username!=="string"||!/^[a-zA-Z0-9_]{3,24}$/.test(d.username)||typeof d.password!=="string"||d.password.length<10||d.password.length>128)return err("username must be 3-24 letters, digits or underscore; password 10-128 chars");
+  const d=await data(r); if(!d||typeof d.username!=="string"||!/^[a-zA-Z0-9_]{3,24}$/.test(d.username)||typeof d.password!=="string"||d.password.length<6||d.password.length>128)return err("invalid_registration_data");
   const name=d.username.toLowerCase(); if(await e.DB.prepare("SELECT id FROM users WHERE username=?").bind(name).first())return err("username_taken",409);
   const id=crypto.randomUUID(), salt=token(16), hash=await passHash(d.password,salt);
   try{await e.DB.prepare("INSERT INTO users(id,username,password_hash,password_salt,display_name,created_at) VALUES(?,?,?,?,?,?)").bind(id,name,hash,salt,name,now()).run()}catch{return err("could_not_create_account",409)}
