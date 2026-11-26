@@ -36,7 +36,10 @@ Requires `ANDROID_JAR` (defaults to the Termux android-34 path), `aapt`, `javac`
 The signing key is kept at `~/.config/kch/debug.keystore` so subsequent builds can update the installed app without changing its Android signing identity. Back up this file securely. If it is lost, a newly generated key will not be able to update an app signed with the old key. Never commit the keystore.
 
 ## Server setup
-The initial D1 schema is in `backend/migrations/0001_initial.sql`. After creating the D1 database, put its real database ID in `backend/wrangler.toml`, apply the migration with Wrangler, then deploy the Worker. These account-specific steps require the project owner to sign in and authorize access. Never commit API tokens or passwords.
+
+The Node.js API for Netrun is in `backend/server.mjs`; `backend/package.json` defines its runtime. Import the GitHub repository into Netrun using branch `work/initial-messenger-foundation` and root directory `/backend`. Netrun should start it with `npm start`. The service listens on the `PORT` environment variable and stores SQLite data at `/data/kch.sqlite` (persistent storage). Use the public HTTPS project URL as the Android API base URL. On the free plan the service sleeps after inactivity and wakes on the next request.
+
+The original Cloudflare Worker remains in `backend/src/index.ts` with its `wrangler.toml` for reference; it is no longer the intended API host for the Russian deployment. Do not delete the Cloudflare project until the Netrun `/health` endpoint and Android login flow have been tested. Never commit API tokens or passwords.
 
 ## Security
 The current API is development scaffolding, not a secure messaging service. A ciphertext database column does not implement end-to-end encryption. Client-side encryption, key management, authorization hardening, rate limiting, and security review are still required. See `docs/SECURITY.md` and `docs/ARCHITECTURE.md`.
