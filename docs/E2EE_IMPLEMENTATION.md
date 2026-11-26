@@ -80,6 +80,13 @@ Limitations: for API 23 compatibility this prototype generates the ECDH pair in 
 
 The Settings diagnostic uses a dedicated local-only test key ID and a far-future expiry so repeated tests verify persistence rather than generating a new key each time. It does not publish this test key.
 
+
+### Asynchronous/offline delivery design draft
+
+See [E2EE_ASYNC_PROTOCOL_DRAFT.md](E2EE_ASYNC_PROTOCOL_DRAFT.md). It defines the intended multi-device model, public/private key boundary, device registration and prekey API contracts, atomic one-time-prekey claims with idempotent retries, offline ciphertext queuing, revocation, and security gates.
+
+This is a design document only. Device registration, one-time-prekey generation, publication, atomic server claims, handshake and offline message delivery are still not implemented. The recipient must have published a valid signed prekey before going offline; if no valid bundle is available, the sender must not fall back to plaintext.
+
 ### Per-message protection
 
 A live messaging protocol still needs a reviewed state machine for:
