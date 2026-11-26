@@ -54,7 +54,8 @@ Message plaintext must be encrypted by the established Signal session. The API s
 
 ## Current implementation status
 
-- Implemented in this branch: AES-256-GCM binary blob primitive with random 96-bit nonce, 128-bit tag, context AAD, strict key length and versioned envelope.
+- Implemented in this branch: AES-256-GCM binary blob primitive with random 96-bit nonce, 128-bit tag, context AAD, strict key length and versioned envelope. Platform crypto prototype: P-256 ECDH key generation/public-key encoding and HKDF-SHA-256; P-256 curve parameters are enforced.
+- Added standalone JVM self-tests for RFC 5869 HKDF test case 1, ECDH agreement, public-key encoding/decoding, and rejection of non-P-256 keys. Run instructions are in `tools/crypto-tests/README.md`. These tests have been added to the repository but have NOT yet been executed in this environment.
 - Not implemented: Signal/libsignal sessions, identity/prekeys, key verification, server key endpoints, blob upload/download, avatar key distribution, encrypted message UI, group key management.
 - Do not use this branch for sensitive communication or claim that K.C.H. is E2EE yet.
 
