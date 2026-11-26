@@ -12,6 +12,7 @@ const db = new Database(DB_PATH);
 db.pragma("foreign_keys = ON");
 db.pragma("journal_mode = WAL");
 db.pragma("busy_timeout = 5000");
+db.pragma("secure_delete = ON");
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -21,7 +22,11 @@ CREATE TABLE IF NOT EXISTS users (
   password_salt TEXT NOT NULL,
   display_name TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  disabled_at INTEGER
+  disabled_at INTEGER,
+  avatar_ciphertext TEXT,
+  avatar_mime TEXT,
+  avatar_version INTEGER NOT NULL DEFAULT 0,
+  avatar_updated_at INTEGER
 );
 CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY NOT NULL,
@@ -58,6 +63,17 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(convers
 
 const userColumns = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
 if (!userColumns.includes("avatar_data")) db.exec("ALTER TABLE users ADD COLUMN avatar_data TEXT");
+if (!userColumns.includes("avatar_ciphertext")) db.exec("ALTER TABLE users ADD COLUMN avatar_ciphertext TEXT");
+if (!userColumns.includes("avatar_mime")) db.exec("ALTER TABLE users ADD COLUMN avatar_mime TEXT");
+if (!userColumns.includes("avatar_version")) db.exec("ALTER TABLE users ADD COLUMN avatar_version INTEGER NOT NULL DEFAULT 0");
+if (!userColumns.includes("avatar_updated_at")) db.exec("ALTER TABLE users ADD COLUMN avatar_updated_at INTEGER");
+// Purge legacy plaintext profile images. New clients must upload encrypted envelopes only.
+db.prepare("UPDATE users SET avatar_data = NULL WHERE avatar_data IS NOT NULL").run();
+function checkpointStorage() {
+  try { db.pragma("wal_checkpoint(TRUNCATE)"); } catch (e) {
+    console.warn("KCH storage checkpoint deferred:", e?.message || e);
+  }
+}
 
 const now = () => Math.floor(Date.now() / 1000);
 const token = (n = 32) => randomBytes(n).toString("base64url");
@@ -69,7 +85,7 @@ const headers = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-methods": "GET, POST, DELETE, OPTIONS",
   "access-control-allow-headers": "Content-Type, Authorization"
 };
 function reply(res, value, status = 200) {
@@ -91,7 +107,7 @@ function currentUser(req) {
   const raw = req.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (!raw) return null;
   return db.prepare(`
-    SELECT u.id, u.username, u.display_name, u.avatar_data
+    SELECT u.id, u.username, u.display_name, u.avatar_ciphertext, u.avatar_mime, u.avatar_version, u.avatar_updated_at
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled_at IS NULL
   `).get(sha(raw), now()) || null;
@@ -169,7 +185,7 @@ const server = createServer(async (req, res) => {
     if (!me) return error(res, "unauthorized", 401);
 
     if (req.method === "GET" && path === "/v1/me") {
-      return reply(res, { id: me.id, username: me.username, displayName: me.display_name, avatar: me.avatar_data || "" });
+      return reply(res, { id: me.id, username: me.username, displayName: me.display_name, avatarCiphertext: me.avatar_ciphertext || "", avatarMime: me.avatar_mime || "", avatarVersion: me.avatar_version || 0, avatarUpdatedAt: me.avatar_updated_at || null });
     }
 
     if (req.method === "POST" && path === "/v1/me/profile") {
@@ -191,21 +207,32 @@ const server = createServer(async (req, res) => {
         }
         displayName = d.displayName.trim();
       }
-      let avatar = me.avatar_data || "";
-      if (d.avatar !== undefined) {
-        if (typeof d.avatar !== "string") return error(res, "avatar_invalid");
-        if (d.avatar.length > 7 * 1024 * 1024) return error(res, "avatar_too_large", 413);
-        const raw = Buffer.from(d.avatar, "base64");
-        if (raw.length > 5 * 1024 * 1024) return error(res, "avatar_too_large", 413);
-        const valid = (raw[0] === 0xFF && raw[1] === 0xD8 && raw[2] === 0xFF) ||
-          (raw[0] === 0x89 && raw[1] === 0x50 && raw[2] === 0x4E && raw[3] === 0x47) ||
-          (raw.toString("ascii", 0, 4) === "RIFF" && raw.toString("ascii", 8, 12) === "WEBP");
-        if (!valid) return error(res, "avatar_format_invalid");
-        avatar = d.avatar;
+      if (d.avatar !== undefined) return error(res, "plaintext_avatar_disabled");
+      let avatarCiphertext = me.avatar_ciphertext || "";
+      let avatarMime = me.avatar_mime || "";
+      let avatarVersion = me.avatar_version || 0;
+      let avatarUpdatedAt = me.avatar_updated_at || null;
+      if (d.avatarCiphertext !== undefined) {
+        if (typeof d.avatarCiphertext !== "string") return error(res, "avatar_ciphertext_invalid");
+        if (d.avatarCiphertext.length > 7 * 1024 * 1024) return error(res, "avatar_too_large", 413);
+        const raw = Buffer.from(d.avatarCiphertext, "base64");
+        if (raw.length > 5 * 1024 * 1024 || raw.length < 28) return error(res, "avatar_ciphertext_invalid");
+        if (!["image/jpeg", "image/png", "image/webp"].includes(d.avatarMime)) return error(res, "avatar_mime_invalid");
+        avatarCiphertext = d.avatarCiphertext;
+        avatarMime = d.avatarMime;
+        avatarVersion += 1;
+        avatarUpdatedAt = now();
       }
-      db.prepare("UPDATE users SET username = ?, display_name = ?, avatar_data = ? WHERE id = ?")
-        .run(username, displayName, avatar, me.id);
-      return reply(res, { id: me.id, username, displayName, avatar });
+      if (d.clearAvatar === true) {
+        avatarCiphertext = "";
+        avatarMime = "";
+        avatarVersion += 1;
+        avatarUpdatedAt = now();
+      }
+      db.prepare("UPDATE users SET username = ?, display_name = ?, avatar_ciphertext = ?, avatar_mime = ?, avatar_version = ?, avatar_updated_at = ?, avatar_data = NULL WHERE id = ?")
+        .run(username, displayName, avatarCiphertext || null, avatarMime || null, avatarVersion, avatarUpdatedAt, me.id);
+      checkpointStorage();
+      return reply(res, { id: me.id, username, displayName, avatarCiphertext, avatarMime, avatarVersion, avatarUpdatedAt });
     }
 
     if (req.method === "GET" && path === "/v1/conversations") {
@@ -248,18 +275,28 @@ const server = createServer(async (req, res) => {
       return reply(res, { id, kind: d.kind, title }, 201);
     }
 
-    const match = path.match(/^\/v1\/conversations\/([0-9a-f-]+)\/messages$/i);
+    const match = path.match(/^\/v1\/conversations\/([0-9a-f-]+)\/messages(?:\/([0-9a-f-]+))?$/i);
     if (match) {
       const conversationId = match[1];
+      const messageId = match[2] || null;
       const member = db.prepare("SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?")
         .get(conversationId, me.id);
       if (!member) return error(res, "not_found", 404);
-      if (req.method === "GET") {
+      if (req.method === "GET" && !messageId) {
         const rows = db.prepare("SELECT id,sender_user_id,ciphertext,created_at FROM messages WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 100")
           .all(conversationId).reverse();
         return reply(res, { messages: rows });
       }
-      if (req.method === "POST") {
+      if (req.method === "DELETE" && messageId) {
+        const message = db.prepare("SELECT id,sender_user_id FROM messages WHERE id = ? AND conversation_id = ?")
+          .get(messageId, conversationId);
+        if (!message) return error(res, "message_not_found", 404);
+        if (message.sender_user_id !== me.id) return error(res, "delete_forbidden", 403);
+        db.prepare("DELETE FROM messages WHERE id = ? AND conversation_id = ?").run(messageId, conversationId);
+        checkpointStorage();
+        return reply(res, { ok: true, deleted: messageId });
+      }
+      if (req.method === "POST" && !messageId) {
         const d = await readJson(req);
         if (!d || typeof d.ciphertext !== "string" || d.ciphertext.length < 16 || d.ciphertext.length > 20000) {
           return error(res, "ciphertext_required");
@@ -279,7 +316,18 @@ const server = createServer(async (req, res) => {
   }
 });
 
+// Expired authentication sessions are pruned; chat history is retained until explicitly deleted.
+const cleanupTimer = setInterval(() => {
+  try {
+    db.prepare("DELETE FROM sessions WHERE expires_at <= ?").run(now());
+    checkpointStorage();
+  } catch (e) {
+    console.warn("KCH scheduled cleanup deferred:", e?.message || e);
+  }
+}, 6 * 60 * 60 * 1000);
+cleanupTimer.unref();
+
 const port = Number(process.env.PORT || 3000);
 server.listen(port, "0.0.0.0", () => {
-  console.log(`K.C.H. API listening on 0.0.0.0:${port}; database: ${DB_PATH}`);
+  console.log("K.C.H. API listening on 0.0.0.0:" + port + "; database: " + DB_PATH);
 });
