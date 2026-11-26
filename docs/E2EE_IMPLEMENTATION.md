@@ -6,20 +6,22 @@ The API and database are untrusted storage/transport. They may see account ident
 
 The existing `Aes256Gcm` helper protects one installation's session token with Android Keystore. It is not a user-to-user encryption mechanism. The existing `avatar_data` field currently stores plaintext Base64 image bytes and MUST NOT be described as encrypted. Existing message `ciphertext` values are only opaque strings; the server does not prove that they were encrypted.
 
-## Protocol choice
+## Protocol direction: platform primitives, not a finished protocol
 
-The current upstream libsignal project exposes Java/Android APIs backed by Rust/JNI and publishes Android AAR artifacts. Its upstream README explicitly says use outside Signal is unsupported and the project is AGPLv3. K.C.H. must account for that license before distributing an app that bundles it. The current Termux APK builder is a custom javac/aapt/d8 pipeline and cannot consume an AAR or package its native JNI libraries yet; a compatible dependency-aware build step is required.
+Project decision: first investigate a no-third-party-library implementation using Android/JCA cryptographic providers. This avoids bundling libsignal/AGPLv3, but it does NOT make a custom protocol equivalent to Signal and does not remove the need for security review.
 
-Do not invent a key exchange, ratchet, group protocol, or identity format. Before adding libsignal, confirm:
-- a pinned, reproducible artifact version and its matching Android/JNI dependencies;
-- Android API 23 compatibility and ABI coverage for the target phones;
-- AGPLv3 compatibility with K.C.H.'s intended distribution;
-- a build process that packages the native libraries correctly;
-- interoperability tests and known test vectors.
+The current app targets Android API 23. Android documents ECDH as available from API 11, while XDH (the JCA name used for X25519) is only available from API 33. Therefore the first compatibility prototype uses ECDH over NIST P-256 (`secp256r1`) plus HKDF-SHA-256. This is a compatibility choice for a prototype, not a claim that it is the best protocol suite for every future device.
 
-If these constraints cannot be met, stop and evaluate another maintained, audited protocol implementation with a compatible license. Do not replace this with a home-grown ratchet.
+`CryptoPrimitives.java` currently provides only:
+- ephemeral P-256 ECDH key-pair generation;
+- X.509 public-key encoding/decoding;
+- HKDF-SHA-256 key derivation with a caller-supplied context.
 
-Use the protocol implementation for one-to-one message sessions, authenticated prekey/session establishment, identity keys, signed prekeys, one-time prekeys, and ratcheting. Group messaging must use a protocol-supported group design (for example, the implementation's Sender Keys support) rather than a home-grown shared AES key. Never fall back to plaintext if crypto setup fails.
+These primitives are NOT a messaging protocol. They do not authenticate public keys, establish trust in a contact, prevent replay, implement a Double Ratchet, provide forward secrecy across individual messages, manage multi-device identity, or solve group/channel key rotation. Do not connect them to live message sending yet. Never fall back to plaintext if a future crypto setup fails.
+
+Before using these primitives for real conversations, the protocol design must define and test identity authentication/signatures, signed prekeys or an equivalent asynchronous setup, replay protection, message ordering, ratchet state, key-change handling, multi-device behavior, group membership changes, and recovery after device loss. If we cannot implement and independently review these correctly, we must use a maintained audited protocol implementation instead of shipping a home-grown ratchet.
+
+Official Android API reference: https://developer.android.com/reference/javax/crypto/KeyAgreement (ECDH API 11+, XDH API 33+).
 
 ## Blob encryption: first building block
 
