@@ -73,15 +73,6 @@ public final class MainActivity extends Activity {
         root.setPadding(dp(18),dp(22),dp(18),dp(22));
         scroll.addView(root);
         setContentView(scroll);
-        LinearLayout brand=new LinearLayout(this);
-        brand.setOrientation(LinearLayout.VERTICAL);
-        brand.setPadding(dp(18),dp(16),dp(18),dp(16));
-        brand.setBackground(glass(0xCC252B48,0xAA342C5B,22));
-        root.addView(brand,params());
-        TextView logo=label("K.C.H.",30,WHITE,true);
-        brand.addView(logo);
-        TextView tagline=label("Kach0ta's Communication Hideout",12,MUTED,false);
-        add(brand,tagline,2);
         TextView section=label(subtitle,10,ACID,true);
         section.setLetterSpacing(.12f);
         add(root,section,18);
@@ -671,7 +662,12 @@ public final class MainActivity extends Activity {
     }
     private void footer(){
         TextView f=label("K.C.H.  •  FOUNDATION BUILD",9,MUTED,false);f.setGravity(Gravity.CENTER);add(root,f,26);
-        TextView c=label("kach0ta  ·  vo1dka  ·  r3z0n  ·  a1r1s",8,Color.rgb(102,105,130),false);
+        String version="unknown";
+        try {
+            String installed=getPackageManager().getPackageInfo(getPackageName(),0).versionName;
+            if(installed!=null&&!installed.isEmpty())version="v"+installed;
+        } catch(Exception ignored) {}
+        TextView c=label("kach0ta  ·  vo1dka  ·  r3z0n  ·  a1r1s  ·  "+version,8,Color.rgb(102,105,130),false);
         c.setGravity(Gravity.CENTER);c.setAlpha(.65f);add(root,c,8);
     }
     @Override protected void onDestroy(){super.onDestroy();io.shutdown();}
