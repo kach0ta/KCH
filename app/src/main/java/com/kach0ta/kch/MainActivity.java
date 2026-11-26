@@ -312,14 +312,22 @@ public final class MainActivity extends Activity {
                 String result;
                 try{
                     byte[] publicKey=DeviceIdentity.getOrCreatePublicKey();
+                    byte[] reloadedPublicKey=DeviceIdentity.getOrCreatePublicKey();
+                    if(!java.security.MessageDigest.isEqual(publicKey,reloadedPublicKey))
+                        throw new GeneralSecurityException("Device identity changed between reads");
+
                     byte[] challenge="KCH-DEVICE-IDENTITY-SELF-TEST-V1".getBytes(StandardCharsets.UTF_8);
                     byte[] signature=DeviceIdentity.sign("SELF-TEST",challenge);
                     boolean valid=DeviceIdentity.verify(publicKey,"SELF-TEST",challenge,signature);
-                    byte[] altered=signature.clone();
-                    altered[0]=(byte)(altered[0]^1);
-                    boolean tamperedAccepted=DeviceIdentity.verify(publicKey,"SELF-TEST",challenge,altered);
-                    if(!valid||tamperedAccepted)throw new GeneralSecurityException("Signature self-test failed");
-                    result="УСПЕШНО: ключ создан/прочитан, подпись проверена, изменённая подпись отклонена. Отпечаток SHA-256: "+DeviceIdentity.fingerprint(publicKey);
+
+                    byte[] alteredChallenge=challenge.clone();
+                    alteredChallenge[alteredChallenge.length-1]^=1;
+                    boolean alteredAccepted=DeviceIdentity.verify(
+                            publicKey,"SELF-TEST",alteredChallenge,signature);
+
+                    if(!valid||alteredAccepted)
+                        throw new GeneralSecurityException("Signature self-test failed");
+                    result="УСПЕШНО: ключ создан и повторно прочитан; подпись создана и проверена; подпись для изменённых данных отклонена. Отпечаток SHA-256: "+DeviceIdentity.fingerprint(publicKey);
                 }catch(Exception e){
                     result="ОШИБКА ПРОВЕРКИ: "+message(e);
                 }
