@@ -422,6 +422,42 @@ public final class MainActivity extends Activity {
             });
         });
 
+        Button deviceRegistrationCheck=button("ПРОВЕРИТЬ ПОДПИСЬ РЕГИСТРАЦИИ УСТРОЙСТВА",PANEL2,WHITE);
+        add(panel,deviceRegistrationCheck,8);
+        TextView deviceRegistrationStatus=label("Проверка регистрации устройства ещё не запускалась.",11,MUTED,false);
+        add(panel,deviceRegistrationStatus,8);
+        deviceRegistrationCheck.setOnClickListener(v->{
+            deviceRegistrationCheck.setEnabled(false);
+            deviceRegistrationStatus.setText("Проверяем подпись регистрации устройства…");
+            io.execute(()->{
+                String report;
+                try{
+                    DeviceRegistrationProof proof=DeviceRegistrationProof.create(
+                            "local-account","local-device");
+                    boolean valid=proof.verify();
+                    byte[] changed=DeviceRegistrationProof.canonicalPayload(
+                            proof.getAccountId(),"substituted-device",
+                            proof.getIdentityPublicKey());
+                    boolean changedAccepted=DeviceIdentity.verify(
+                            proof.getIdentityPublicKey(),"DEVICE-REGISTRATION-V1",
+                            changed,proof.getSignature());
+                    java.security.KeyPair other=CryptoPrimitives.newEphemeralKeyPair();
+                    byte[] foreign=CryptoPrimitives.encodePublicKey(other.getPublic());
+                    boolean foreignAccepted=proof.verifyAgainst(foreign);
+                    if(!valid||changedAccepted||foreignAccepted)
+                        throw new GeneralSecurityException("Device registration proof self-test failed");
+                    report="УСПЕШНО: регистрационная подпись действительна; подмена ID устройства и чужой identity отклонены.";
+                }catch(Exception e){
+                    report="ОШИБКА РЕГИСТРАЦИИ УСТРОЙСТВА: "+message(e);
+                }
+                final String result=report;
+                runOnUiThread(()->{
+                    deviceRegistrationStatus.setText(result);
+                    deviceRegistrationCheck.setEnabled(true);
+                });
+            });
+        });
+
         Button oneTimeCheck=button("ПРОВЕРИТЬ ОДНОРАЗОВЫЕ PREKEY",PANEL2,WHITE);
         add(panel,oneTimeCheck,8);
         TextView oneTimeStatus=label("Пул одноразовых ключей ещё не проверялся.",11,MUTED,false);
