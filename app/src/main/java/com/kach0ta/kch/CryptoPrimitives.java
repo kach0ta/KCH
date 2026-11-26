@@ -9,6 +9,8 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.ECGenParameterSpec;
 import java.security.spec.X509EncodedKeySpec;
+import java.security.interfaces.ECKey;
+import java.security.spec.ECParameterSpec;
 import java.util.Arrays;
 import javax.crypto.KeyAgreement;
 import javax.crypto.Mac;
@@ -42,9 +44,7 @@ public final class CryptoPrimitives {
 
     /** Encodes a public key using the standard X.509 SubjectPublicKeyInfo format. */
     public static byte[] encodePublicKey(PublicKey publicKey) throws GeneralSecurityException {
-        if (publicKey == null || !"EC".equalsIgnoreCase(publicKey.getAlgorithm())) {
-            throw new GeneralSecurityException("An EC public key is required");
-        }
+        requireP256(publicKey);
         return publicKey.getEncoded();
     }
 
@@ -53,7 +53,9 @@ public final class CryptoPrimitives {
         if (encoded == null || encoded.length == 0 || encoded.length > 1024) {
             throw new GeneralSecurityException("Invalid public key encoding");
         }
-        return KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encoded));
+        PublicKey key = KeyFactory.getInstance("EC").generatePublic(new X509EncodedKeySpec(encoded));
+        requireP256(key);
+        return key;
     }
 
     /**
@@ -67,6 +69,8 @@ public final class CryptoPrimitives {
         if (localPrivate == null || peerPublic == null) {
             throw new GeneralSecurityException("ECDH keys are required");
         }
+        requireP256(localPrivate);
+        requireP256(peerPublic);
         if (context == null || context.length() == 0) {
             throw new GeneralSecurityException("A non-empty context is required");
         }
@@ -123,6 +127,23 @@ public final class CryptoPrimitives {
             Arrays.fill(prk, (byte) 0);
             Arrays.fill(actualSalt, (byte) 0);
             if (previous.length > 0) Arrays.fill(previous, (byte) 0);
+        }
+    }
+
+
+    private static void requireP256(java.security.Key key) throws GeneralSecurityException {
+        if (!(key instanceof ECKey) || !"EC".equalsIgnoreCase(key.getAlgorithm())) {
+            throw new GeneralSecurityException("A P-256 EC key is required");
+        }
+        ECParameterSpec actual = ((ECKey) key).getParams();
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("EC");
+        generator.initialize(new ECGenParameterSpec(CURVE));
+        ECParameterSpec expected = ((ECKey) generator.generateKeyPair().getPrivate()).getParams();
+        if (!actual.getCurve().equals(expected.getCurve())
+                || !actual.getGenerator().equals(expected.getGenerator())
+                || !actual.getOrder().equals(expected.getOrder())
+                || actual.getCofactor() != expected.getCofactor()) {
+            throw new GeneralSecurityException("Only secp256r1 (P-256) keys are accepted");
         }
     }
 
