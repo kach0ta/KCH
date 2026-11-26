@@ -383,6 +383,45 @@ public final class MainActivity extends Activity {
             });
         });
 
+        Button storageCheck=button("ПРОВЕРИТЬ ХРАНЕНИЕ PREKEY",PANEL2,WHITE);
+        add(panel,storageCheck,8);
+        TextView storageStatus=label("Проверка локального хранения ещё не запускалась.",11,MUTED,false);
+        add(panel,storageStatus,8);
+        storageCheck.setOnClickListener(v->{
+            storageCheck.setEnabled(false);
+            storageStatus.setText("Проверяем зашифрованное хранилище…");
+            io.execute(()->{
+                String report;
+                try{
+                    long expiry=4102444800L;
+                    LocalPreKeyStore.StoredPreKey first=LocalPreKeyStore.getOrCreate(
+                            this,"local-account","local-device",
+                            "settings-self-test-v1",expiry);
+                    LocalPreKeyStore.StoredPreKey second=LocalPreKeyStore.getOrCreate(
+                            this,"local-account","local-device",
+                            "settings-self-test-v1",expiry);
+                    byte[] firstPublic=CryptoPrimitives.encodePublicKey(first.keyPair.getPublic());
+                    byte[] secondPublic=CryptoPrimitives.encodePublicKey(second.keyPair.getPublic());
+                    byte[] firstPrivate=first.keyPair.getPrivate().getEncoded();
+                    byte[] secondPrivate=second.keyPair.getPrivate().getEncoded();
+                    boolean samePublic=java.security.MessageDigest.isEqual(firstPublic,secondPublic);
+                    boolean samePrivate=java.security.MessageDigest.isEqual(firstPrivate,secondPrivate);
+                    boolean signed=second.bundle.verify(DeviceIdentity.getOrCreatePublicKey(),
+                            System.currentTimeMillis()/1000L);
+                    if(!samePublic||!samePrivate||!signed)
+                        throw new GeneralSecurityException("Local prekey persistence check failed");
+                    report="УСПЕШНО: приватный ключ восстановлен после повторного чтения; публичный ключ совпадает; подпись identity действительна. Приватный ключ хранится в зашифрованном виде локально.";
+                }catch(Exception e){
+                    report="ОШИБКА ХРАНЕНИЯ PREKEY: "+message(e);
+                }
+                final String result=report;
+                runOnUiThread(()->{
+                    storageStatus.setText(result);
+                    storageCheck.setEnabled(true);
+                });
+            });
+        });
+
         Button back=button("НАЗАД К ЧАТАМ",PURPLE,WHITE);add(panel,back,18);back.setOnClickListener(v->renderHome());
         footer();
     }
