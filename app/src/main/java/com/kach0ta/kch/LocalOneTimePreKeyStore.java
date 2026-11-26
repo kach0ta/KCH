@@ -73,6 +73,12 @@ public final class LocalOneTimePreKeyStore {
         if (existingStatus != null) {
             return load(context, accountId, deviceId, keyId);
         }
+        boolean partialRecord = prefs.contains(base + "account")
+                || prefs.contains(base + "device") || prefs.contains(base + "public")
+                || prefs.contains(base + "signature") || prefs.contains(base + "private");
+        if (partialRecord) {
+            throw new GeneralSecurityException("Incomplete one-time prekey record; refusing overwrite");
+        }
         if (countRecords(prefs) >= MAX_POOL_SIZE) {
             throw new GeneralSecurityException("One-time prekey pool is full");
         }
