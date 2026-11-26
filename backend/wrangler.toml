@@ -9,3 +9,5 @@ database_id = "03d0d215-efad-48c8-821d-0a35820322ac"
 
 [vars]
 APP_ENV = "production"
+
+# Trigger Git-connected Cloudflare deployment.
