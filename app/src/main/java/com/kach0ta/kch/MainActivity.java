@@ -339,6 +339,50 @@ public final class MainActivity extends Activity {
             });
         });
 
+        Button prekeyCheck=button("ПРОВЕРИТЬ ПОДПИСЬ PREKEY",PANEL2,WHITE);
+        add(panel,prekeyCheck,8);
+        TextView prekeyStatus=label("Проверка предварительного ключа ещё не запускалась.",11,MUTED,false);
+        add(panel,prekeyStatus,8);
+        prekeyCheck.setOnClickListener(v->{
+            prekeyCheck.setEnabled(false);
+            prekeyStatus.setText("Проверяем подпись предварительного ключа…");
+            io.execute(()->{
+                String report;
+                try{
+                    byte[] trustedIdentity=DeviceIdentity.getOrCreatePublicKey();
+                    java.security.KeyPair prekey=CryptoPrimitives.newEphemeralKeyPair();
+                    long now=System.currentTimeMillis()/1000L;
+                    SignedPreKeyBundle bundle=SignedPreKeyBundle.create(
+                            "local-account","local-device","spk-self-test-1",
+                            now+3600L,prekey.getPublic());
+                    boolean valid=bundle.verify(trustedIdentity,now);
+
+                    byte[] changedTranscript=SignedPreKeyBundle.canonicalPayload(
+                            bundle.accountId,bundle.deviceId,"spk-substituted",
+                            bundle.expiresAtEpochSeconds,bundle.getPublicKeyEncoded());
+                    boolean changedAccepted=DeviceIdentity.verify(
+                            trustedIdentity,"SIGNED-PREKEY-V1",
+                            changedTranscript,bundle.getSignature());
+
+                    java.security.KeyPair attacker=CryptoPrimitives.newEphemeralKeyPair();
+                    byte[] attackerIdentity=CryptoPrimitives.encodePublicKey(attacker.getPublic());
+                    boolean wrongIdentityAccepted=bundle.verify(attackerIdentity,now);
+                    boolean expiredAccepted=bundle.verify(trustedIdentity,now+7200L);
+
+                    if(!valid||changedAccepted||wrongIdentityAccepted||expiredAccepted)
+                        throw new GeneralSecurityException("Signed prekey self-test failed");
+                    report="УСПЕШНО: подпись верна; подмена ID ключа отклонена; чужая identity отклонена; просроченный bundle отклонён.";
+                }catch(Exception e){
+                    report="ОШИБКА ПРОВЕРКИ PREKEY: "+message(e);
+                }
+                final String result=report;
+                runOnUiThread(()->{
+                    prekeyStatus.setText(result);
+                    prekeyCheck.setEnabled(true);
+                });
+            });
+        });
+
         Button back=button("НАЗАД К ЧАТАМ",PURPLE,WHITE);add(panel,back,18);back.setOnClickListener(v->renderHome());
         footer();
     }
