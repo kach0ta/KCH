@@ -114,11 +114,20 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "POST" && path === "/v1/auth/register") {
       const d = await readJson(req);
-      if (!d || typeof d.username !== "string" || !/^[a-zA-Z0-9_]{3,24}$/.test(d.username) ||
-          typeof d.password !== "string" || d.password.length < 6 || d.password.length > 128) {
-        return error(res, "invalid_registration_data");
+      if (!d || typeof d.username !== "string" || typeof d.password !== "string") {
+        return error(res, "credentials_required");
       }
-      const username = d.username.toLowerCase();
+      const rawUsername = d.username;
+      const rawPassword = d.password;
+      if (!rawUsername.length) return error(res, "username_required");
+      if (rawUsername.length < 4) return error(res, "username_too_short");
+      if (rawUsername.length > 24) return error(res, "username_too_long");
+      if (!/^[A-Za-z0-9_]+$/.test(rawUsername)) return error(res, "username_invalid_characters");
+      if (!rawPassword.length) return error(res, "password_required");
+      if (rawPassword.length < 6) return error(res, "password_too_short");
+      if (rawPassword.length > 8) return error(res, "password_too_long");
+      if (!/^[A-Za-z0-9_]+$/.test(rawPassword)) return error(res, "password_invalid_characters");
+      const username = rawUsername.toLowerCase();
       if (db.prepare("SELECT id FROM users WHERE username = ?").get(username)) {
         return error(res, "username_taken", 409);
       }
