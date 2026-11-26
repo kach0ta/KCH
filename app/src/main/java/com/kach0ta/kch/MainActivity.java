@@ -273,6 +273,16 @@ public final class MainActivity extends Activity {
         add(empty,label(subtitle,12,MUTED,false),5);
     }
 
+    private void showSelfChat(String id) {
+        base("ИЗБРАННОЕ");
+        LinearLayout card=panel();add(root,card,8);
+        add(card,label("Твои заметки",22,WHITE,true),2);
+        add(card,label("Личный чат с самим собой. Здесь можно будет хранить ссылки, заметки и сообщения.",13,MUTED,false),8);
+        add(card,label("Чат создан. Отправка сообщений появится после подключения защищённого обмена.",12,CYAN,false),14);
+        Button back=button("НАЗАД К ЧАТАМ",PURPLE,WHITE);add(card,back,18);back.setOnClickListener(v->loadChats());
+        footer();
+    }
+
     private void showSettings() {
         base("НАСТРОЙКИ");
         LinearLayout panel=panel();add(root,panel,8);
@@ -332,7 +342,7 @@ public final class MainActivity extends Activity {
                     JSONObject body=new JSONObject();body.put("avatar",b64);
                     JSONObject updated=request("POST","/v1/me/profile",body,sessionToken());myProfile=updated;
                     runOnUiThread(()->android.widget.Toast.makeText(this,"Фото профиля обновлено",android.widget.Toast.LENGTH_SHORT).show());
-                }catch(Exception e){runOnUiThread(()->showStatus(message(e)));}
+                }catch(Exception e){runOnUiThread(()->android.widget.Toast.makeText(this,message(e),android.widget.Toast.LENGTH_LONG).show());}
             });
         }
     }
@@ -357,7 +367,7 @@ public final class MainActivity extends Activity {
         io.execute(()->{try{
             JSONObject body=new JSONObject();body.put("kind","direct");body.put("self",true);
             JSONObject result=request("POST","/v1/conversations",body,sessionToken());
-            runOnUiThread(()->{showStatus("Личный чат создан: "+result.optString("id"));loadChats();});
+            runOnUiThread(()->showSelfChat(result.optString("id")));
         }catch(Exception e){runOnUiThread(()->showStatus(message(e)));}});
     }
 
