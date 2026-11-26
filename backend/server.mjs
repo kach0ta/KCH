@@ -216,7 +216,7 @@ const server = createServer(async (req, res) => {
         if (typeof d.avatarCiphertext !== "string") return error(res, "avatar_ciphertext_invalid");
         if (d.avatarCiphertext.length > 7 * 1024 * 1024) return error(res, "avatar_too_large", 413);
         const raw = Buffer.from(d.avatarCiphertext, "base64");
-        if (raw.length > 5 * 1024 * 1024 || raw.length < 28) return error(res, "avatar_ciphertext_invalid");
+        if (raw.length > 5 * 1024 * 1024 + 64 || raw.length < 28) return error(res, "avatar_ciphertext_invalid");
         if (!["image/jpeg", "image/png", "image/webp"].includes(d.avatarMime)) return error(res, "avatar_mime_invalid");
         avatarCiphertext = d.avatarCiphertext;
         avatarMime = d.avatarMime;
