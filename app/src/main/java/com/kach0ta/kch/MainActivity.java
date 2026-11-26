@@ -27,7 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
-    private static final String API = "https://kch-api.nigdog950.workers.dev";
+    private static final String API = "https://kch-api.de2.netrun.io";
     private static final int BG=Color.rgb(10,9,15), PANEL=Color.rgb(23,19,34);
     private static final int PURPLE=Color.rgb(166,104,255), ACID=Color.rgb(190,255,55), MUTED=Color.rgb(165,158,180);
     private final ExecutorService io = Executors.newSingleThreadExecutor();
@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
     private void showAuth() {
         base("ЛИЧНЫЙ МЕССЕНДЖЕР");
         add(root,label("Твой уголок приватности.",23,Color.WHITE,true),8);
-        add(root,label("Войди или создай аккаунт. Имя пользователя: 3–24 символа, пароль: минимум 6 символов.",13,MUTED,false),8);
+        add(root,label("Войди или создай аккаунт. Ник: 4–24 символа, пароль: 6–8 символов. Только английские буквы, цифры и _.",13,MUTED,false),8);
         username=new EditText(this); username.setSingleLine(true); username.setHint("Имя пользователя"); username.setTextColor(Color.WHITE); username.setHintTextColor(MUTED); username.setBackgroundColor(PANEL); add(root,username,18);
         password=new EditText(this); password.setSingleLine(true); password.setHint("Пароль"); password.setInputType(129); password.setTextColor(Color.WHITE); password.setHintTextColor(MUTED); password.setBackgroundColor(PANEL); add(root,password,10);
         Button login=button("ВОЙТИ",PURPLE); add(root,login,18);
@@ -67,8 +67,8 @@ public final class MainActivity extends Activity {
 
     private void authenticate(boolean create) {
         String name=username.getText().toString().trim(), pass=password.getText().toString();
-        if(name.isEmpty()||pass.isEmpty()){ showStatus("Заполни оба поля."); return; }
-        if(pass.length()<6){ showStatus("Пароль должен содержать минимум 6 символов."); return; }
+        String validation=validateCredentials(name,pass);
+        if(validation!=null){ showStatus(validation); return; }
         hideKeyboard();
         JSONObject body=new JSONObject();
         try { body.put("username",name); body.put("password",pass); } catch(Exception ignored) {}
@@ -130,15 +130,35 @@ public final class MainActivity extends Activity {
         return out;
     }
 
+    private String validateCredentials(String name,String pass){
+        if(name.isEmpty()) return "Введи ник.";
+        if(name.length()<4) return "Ник слишком короткий. Нужно минимум 4 символа.";
+        if(name.length()>24) return "Ник слишком длинный. Максимум 24 символа.";
+        if(!name.matches("[A-Za-z0-9_]+")) return "В нике разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
+        if(pass.isEmpty()) return "Введи пароль.";
+        if(pass.length()<6) return "Пароль слишком короткий. Нужно минимум 6 символов.";
+        if(pass.length()>8) return "Пароль слишком длинный. Максимум 8 символов.";
+        if(!pass.matches("[A-Za-z0-9_]+")) return "В пароле разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
+        return null;
+    }
+
     private void showStatus(String s){if(status!=null)status.setText(s);}
     private String message(Exception e){
         String m=e.getMessage();
         if(m==null)return "Не удалось связаться с сервером.";
-        if(m.contains("username_taken"))return "Это имя пользователя уже занято.";
-        if(m.contains("invalid_credentials"))return "Неверное имя пользователя или пароль.";
-        if(m.contains("credentials_required"))return "Введи имя пользователя и пароль.";
-        if(m.contains("invalid_registration_data")||m.contains("username must be"))return "Проверь данные: имя пользователя должно содержать 3–24 символа, пароль — 6–128 символов.";
-        if(m.contains("could_not_create_account"))return "Не удалось создать аккаунт. Попробуй ещё раз.";
+        if(m.contains("username_taken"))return "Этот ник уже занят. Выбери другой.";
+        if(m.contains("username_too_short"))return "Ник слишком короткий. Нужно минимум 4 символа.";
+        if(m.contains("username_too_long"))return "Ник слишком длинный. Максимум 24 символа.";
+        if(m.contains("username_invalid_characters"))return "В нике разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
+        if(m.contains("username_required"))return "Введи ник.";
+        if(m.contains("password_too_short"))return "Пароль слишком короткий. Нужно минимум 6 символов.";
+        if(m.contains("password_too_long"))return "Пароль слишком длинный. Максимум 8 символов.";
+        if(m.contains("password_invalid_characters"))return "В пароле разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
+        if(m.contains("password_required"))return "Введи пароль.";
+        if(m.contains("invalid_credentials"))return "Неверный ник или пароль. Проверь правильность ввода.";
+        if(m.contains("credentials_required"))return "Введи ник и пароль.";
+        if(m.contains("could_not_create_account"))return "Не удалось создать аккаунт из-за ошибки базы данных. Попробуй позже.";
+        if(m.contains("server_error"))return "На сервере произошла внутренняя ошибка. Попробуй позже.";
         if(m.contains("unauthorized"))return "Сессия завершилась. Войди снова.";
         String lower=m.toLowerCase();
         if(lower.contains("unable to resolve host")||lower.contains("failed to connect")||lower.contains("timeout")||lower.contains("network is unreachable"))return "Нет соединения с сервером. Проверь интернет.";
