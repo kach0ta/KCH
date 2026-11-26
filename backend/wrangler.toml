@@ -1,1 +1,11 @@
-name = "kch-api"\nmain = "src/index.ts"\ncompatibility_date = "2026-11-25"\n\n[[d1_databases]]\nbinding = "DB"\ndatabase_name = "kch-db"\ndatabase_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"\n\n[vars]\nAPP_ENV = "production"\n
+name = "kch-api"
+main = "src/index.ts"
+compatibility_date = "2026-11-25"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kch-db"
+database_id = "03d0d215-efad-48c8-821d-0a35820322ac"
+
+[vars]
+APP_ENV = "production"
