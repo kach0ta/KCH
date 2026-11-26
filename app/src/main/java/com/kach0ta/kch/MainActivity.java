@@ -422,6 +422,51 @@ public final class MainActivity extends Activity {
             });
         });
 
+        Button oneTimeCheck=button("ПРОВЕРИТЬ ОДНОРАЗОВЫЕ PREKEY",PANEL2,WHITE);
+        add(panel,oneTimeCheck,8);
+        TextView oneTimeStatus=label("Пул одноразовых ключей ещё не проверялся.",11,MUTED,false);
+        add(panel,oneTimeStatus,8);
+        oneTimeCheck.setOnClickListener(v->{
+            oneTimeCheck.setEnabled(false);
+            oneTimeStatus.setText("Создаём и повторно загружаем одноразовый ключ…");
+            io.execute(()->{
+                String report;
+                try{
+                    String keyId="settings-otpk-self-test-v1";
+                    LocalOneTimePreKeyStore.StoredOneTimePreKey first=
+                            LocalOneTimePreKeyStore.getOrCreate(
+                                    this,"local-account","local-device",keyId);
+                    LocalOneTimePreKeyStore.StoredOneTimePreKey second=
+                            LocalOneTimePreKeyStore.load(
+                                    this,"local-account","local-device",keyId);
+                    byte[] firstPublic=first.publicKeyEncoded;
+                    byte[] secondPublic=second.publicKeyEncoded;
+                    byte[] firstPrivate=first.keyPair.getPrivate().getEncoded();
+                    byte[] secondPrivate=second.keyPair.getPrivate().getEncoded();
+                    boolean samePublic=java.security.MessageDigest.isEqual(firstPublic,secondPublic);
+                    boolean samePrivate=java.security.MessageDigest.isEqual(firstPrivate,secondPrivate);
+                    byte[] transcript=OneTimePreKeyBundle.canonicalPayload(
+                            second.accountId,second.deviceId,second.keyId,second.publicKeyEncoded);
+                    boolean signed=DeviceIdentity.verify(DeviceIdentity.getOrCreatePublicKey(),
+                            "ONE-TIME-PREKEY-V1",transcript,second.signature);
+                    java.security.KeyPair other=CryptoPrimitives.newEphemeralKeyPair();
+                    byte[] otherIdentity=CryptoPrimitives.encodePublicKey(other.getPublic());
+                    boolean foreignAccepted=DeviceIdentity.verify(otherIdentity,
+                            "ONE-TIME-PREKEY-V1",transcript,second.signature);
+                    if(!samePublic||!samePrivate||!signed||foreignAccepted)
+                        throw new GeneralSecurityException("One-time prekey self-test failed");
+                    report="УСПЕШНО: одноразовый ключ сохранён и восстановлен; публичная и приватная части совпали; подпись identity действительна; чужая identity отклонена. Статус: "+second.status+". Ключ остаётся только на устройстве.";
+                }catch(Exception e){
+                    report="ОШИБКА ОДНОРАЗОВОГО PREKEY: "+message(e);
+                }
+                final String result=report;
+                runOnUiThread(()->{
+                    oneTimeStatus.setText(result);
+                    oneTimeCheck.setEnabled(true);
+                });
+            });
+        });
+
         Button back=button("НАЗАД К ЧАТАМ",PURPLE,WHITE);add(panel,back,18);back.setOnClickListener(v->renderHome());
         footer();
     }
