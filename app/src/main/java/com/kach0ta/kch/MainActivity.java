@@ -3,6 +3,7 @@ package com.kach0ta.kch;
 import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -23,154 +24,342 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
     private static final String API = "https://kch-api.de2.netrun.io";
-    private static final int BG=Color.rgb(10,9,15), PANEL=Color.rgb(23,19,34);
-    private static final int PURPLE=Color.rgb(166,104,255), ACID=Color.rgb(190,255,55), MUTED=Color.rgb(165,158,180);
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
+    private static final int BG=Color.rgb(9,11,20), PANEL=Color.rgb(25,29,48);
+    private static final int PANEL2=Color.rgb(34,39,64), PURPLE=Color.rgb(169,126,255);
+    private static final int ACID=Color.rgb(194,255,92), CYAN=Color.rgb(130,211,255);
+    private static final int WHITE=Color.rgb(245,246,255), MUTED=Color.rgb(166,174,198);
+    private static final String TOKEN_AAD="kch.session.token.v1";
+    private final ExecutorService io=Executors.newSingleThreadExecutor();
     private SharedPreferences prefs;
-    private LinearLayout root;
-    private EditText username, password;
+    private LinearLayout root, content;
+    private EditText username,password;
     private TextView status;
+    private JSONArray cachedChats=new JSONArray();
+    private String selectedTab="chats";
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
         prefs=getSharedPreferences("kch_session",MODE_PRIVATE);
-        getWindow().setStatusBarColor(BG); getWindow().setNavigationBarColor(BG);
-        if (prefs.getString("token",null)!=null) loadChats(); else showAuth();
+        getWindow().setStatusBarColor(BG);
+        getWindow().setNavigationBarColor(BG);
+        getWindow().getDecorView().setSystemUiVisibility(0);
+        String token=readEncryptedToken();
+        if(token!=null) loadChats(); else showAuth();
     }
 
     private void base(String subtitle) {
-        ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true); scroll.setBackgroundColor(BG);
-        root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(22),dp(30),dp(22),dp(24));
-        scroll.addView(root); setContentView(scroll);
-        root.addView(label("K.C.H.",34,Color.WHITE,true));
-        add(root,label("Kach0ta's Communication Hideout",14,MUTED,false),4);
-        add(root,label(subtitle,11,ACID,true),28);
+        ScrollView scroll=new ScrollView(this);
+        scroll.setFillViewport(true);
+        scroll.setBackgroundColor(BG);
+        scroll.setClipToPadding(false);
+        root=new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(18),dp(22),dp(18),dp(22));
+        scroll.addView(root);
+        setContentView(scroll);
+        LinearLayout brand=new LinearLayout(this);
+        brand.setOrientation(LinearLayout.VERTICAL);
+        brand.setPadding(dp(18),dp(16),dp(18),dp(16));
+        brand.setBackground(glass(0xCC252B48,0xAA342C5B,22));
+        root.addView(brand,params());
+        TextView logo=label("K.C.H.",30,WHITE,true);
+        brand.addView(logo);
+        TextView tagline=label("Kach0ta's Communication Hideout",12,MUTED,false);
+        add(brand,tagline,2);
+        TextView section=label(subtitle,10,ACID,true);
+        section.setLetterSpacing(.12f);
+        add(root,section,18);
     }
 
     private void showAuth() {
-        base("ЛИЧНЫЙ МЕССЕНДЖЕР");
-        add(root,label("Твой уголок приватности.",23,Color.WHITE,true),8);
-        add(root,label("Войди или создай аккаунт. Ник: 4–24 символа, пароль: 6–8 символов. Только английские буквы, цифры и _.",13,MUTED,false),8);
-        username=new EditText(this); username.setSingleLine(true); username.setHint("Имя пользователя"); username.setTextColor(Color.WHITE); username.setHintTextColor(MUTED); username.setBackgroundColor(PANEL); add(root,username,18);
-        password=new EditText(this); password.setSingleLine(true); password.setHint("Пароль"); password.setInputType(129); password.setTextColor(Color.WHITE); password.setHintTextColor(MUTED); password.setBackgroundColor(PANEL); add(root,password,10);
-        Button login=button("ВОЙТИ",PURPLE); add(root,login,18);
-        Button register=button("СОЗДАТЬ АККАУНТ",ACID); add(root,register,10);
-        status=label("",13,MUTED,false); add(root,status,14);
-        login.setOnClickListener(v->authenticate(false)); register.setOnClickListener(v->authenticate(true));
+        base("PRIVATE MESSENGER  /  ВХОД");
+        LinearLayout panel=panel();
+        add(root,panel,8);
+        add(panel,label("Связь без лишнего шума.",23,WHITE,true),2);
+        add(panel,label("Войди или создай аккаунт K.C.H.",13,MUTED,false),7);
+        username=field("Имя пользователя",false);
+        add(panel,username,18);
+        password=field("Пароль",true);
+        add(panel,password,10);
+        Button login=button("ВОЙТИ",PURPLE,WHITE);
+        add(panel,login,16);
+        Button register=button("СОЗДАТЬ АККАУНТ",ACID,BG);
+        add(panel,register,9);
+        status=label("",12,CYAN,false);
+        add(panel,status,12);
+        login.setOnClickListener(v->authenticate(false));
+        register.setOnClickListener(v->authenticate(true));
+        add(root,label("AES-256-GCM · ЛОКАЛЬНЫЙ КЛЮЧ ANDROID KEYSTORE",9,MUTED,true),20);
         footer();
     }
 
     private void authenticate(boolean create) {
-        String name=username.getText().toString().trim(), pass=password.getText().toString();
+        String name=username.getText().toString().trim();
+        String pass=password.getText().toString();
         String validation=validateCredentials(name,pass);
-        if(validation!=null){ showStatus(validation); return; }
+        if(validation!=null){showStatus(validation);return;}
         hideKeyboard();
         JSONObject body=new JSONObject();
-        try { body.put("username",name); body.put("password",pass); } catch(Exception ignored) {}
+        try{body.put("username",name);body.put("password",pass);}catch(Exception ignored){}
         showStatus("Подключаемся к серверу…");
         io.execute(()->{
-            try {
+            try{
                 JSONObject result=request("POST",create?"/v1/auth/register":"/v1/auth/login",body,null);
                 String token=result.getString("token");
-                prefs.edit().putString("token",token).putString("username",name.toLowerCase()).apply();
+                String encrypted=Aes256Gcm.encrypt(token,TOKEN_AAD.getBytes(StandardCharsets.UTF_8));
+                prefs.edit().putString("token_enc",encrypted).remove("token").putString("username",name.toLowerCase()).apply();
                 runOnUiThread(this::loadChats);
-            } catch(Exception e){ runOnUiThread(()->showStatus(message(e))); }
+            }catch(Exception e){runOnUiThread(()->showStatus(message(e)));}
         });
+    }
+
+    private String readEncryptedToken() {
+        String encrypted=prefs.getString("token_enc",null);
+        if(encrypted!=null){
+            try{return Aes256Gcm.decrypt(encrypted,TOKEN_AAD.getBytes(StandardCharsets.UTF_8));}
+            catch(Exception e){prefs.edit().remove("token_enc").remove("token").apply();return null;}
+        }
+        // One-time migration of the old plaintext session token.
+        String legacy=prefs.getString("token",null);
+        if(legacy==null)return null;
+        try{
+            String sealed=Aes256Gcm.encrypt(legacy,TOKEN_AAD.getBytes(StandardCharsets.UTF_8));
+            prefs.edit().putString("token_enc",sealed).remove("token").apply();
+            return legacy;
+        }catch(GeneralSecurityException e){
+            prefs.edit().remove("token").apply();
+            return null;
+        }
+    }
+
+    private String sessionToken() {
+        try{
+            String value=prefs.getString("token_enc",null);
+            return value==null?null:Aes256Gcm.decrypt(value,TOKEN_AAD.getBytes(StandardCharsets.UTF_8));
+        }catch(Exception e){return null;}
     }
 
     private void loadChats() {
         base("ТВОЁ ПРОСТРАНСТВО");
-        add(root,label("Загрузка диалогов…",14,MUTED,false),12);
+        add(root,label("Загружаем твои диалоги…",14,MUTED,false),14);
         io.execute(()->{
-            try {
-                JSONObject data=request("GET","/v1/conversations",null,prefs.getString("token",null));
+            try{
+                JSONObject data=request("GET","/v1/conversations",null,sessionToken());
                 JSONArray chats=data.optJSONArray("conversations");
-                runOnUiThread(()->renderChats(chats==null?new JSONArray():chats));
-            } catch(Exception e) {
+                runOnUiThread(()->{cachedChats=chats==null?new JSONArray():chats;renderHome();});
+            }catch(Exception e){
                 runOnUiThread(()->{
-                    if(message(e).contains("unauthorized")) { prefs.edit().remove("token").apply(); showAuth(); }
-                    else { base("ОШИБКА СОЕДИНЕНИЯ"); add(root,label(message(e),14,MUTED,false),12); add(root,button("ПОВТОРИТЬ",PURPLE),16); ((Button)root.getChildAt(root.getChildCount()-1)).setOnClickListener(v->loadChats()); footer(); }
+                    if(message(e).contains("unauthorized")){prefs.edit().clear().apply();showAuth();}
+                    else{
+                        base("НЕТ СОЕДИНЕНИЯ");
+                        LinearLayout panel=panel();add(root,panel,8);
+                        add(panel,label("Не удалось загрузить чаты",19,WHITE,true),2);
+                        add(panel,label(message(e),13,MUTED,false),8);
+                        Button retry=button("ПОВТОРИТЬ",PURPLE,WHITE);add(panel,retry,14);retry.setOnClickListener(v->loadChats());
+                        footer();
+                    }
                 });
             }
         });
     }
 
-    private void renderChats(JSONArray chats) {
+    private void renderHome() {
         base("ТВОЁ ПРОСТРАНСТВО");
-        add(root,label("Привет, "+prefs.getString("username","")+".",20,Color.WHITE,true),8);
-        add(root,label("Список чатов",12,PURPLE,true),20);
-        if(chats.length()==0) add(root,label("Пока здесь пусто. Для начала нужен второй аккаунт и созданный диалог.",14,MUTED,false),10);
-        for(int i=0;i<chats.length();i++){
-            JSONObject c=chats.optJSONObject(i); if(c==null)continue;
-            String kind=c.optString("kind","chat"), title=c.optString("title","");
-            if(title.isEmpty()) title=kind.equals("direct")?"Личный чат":kind.equals("group")?"Группа":"Приватный канал";
-            root.addView(card(title,kind+" · "+c.optString("role","member")));
-        }
-        Button refresh=button("ОБНОВИТЬ",PURPLE); add(root,refresh,20); refresh.setOnClickListener(v->loadChats());
-        Button logout=button("ВЫЙТИ ИЗ АККАУНТА",PANEL); add(root,logout,10);
+        LinearLayout top=new LinearLayout(this);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        TextView greeting=label("Привет, "+prefs.getString("username","")+".",20,WHITE,true);
+        top.addView(greeting,new LinearLayout.LayoutParams(0,-2,1));
+        TextView online=label("● ONLINE",10,ACID,true);
+        top.addView(online);
+        add(root,top,8);
+        EditText search=field("Поиск по чатам",false);
+        search.setFocusable(false);
+        search.setOnClickListener(v->showStatus("Поиск подключим вместе с экраном чатов."));
+        add(root,search,16);
+
+        LinearLayout tabs=new LinearLayout(this);
+        tabs.setOrientation(LinearLayout.HORIZONTAL);
+        tabs.setPadding(dp(4),dp(4),dp(4),dp(4));
+        tabs.setBackground(glass(0xAA20243A,0xAA292B49,20));
+        add(root,tabs,14);
+        addTab(tabs,"Чаты","chats");
+        addTab(tabs,"Избранное","favorites");
+        addTab(tabs,"Каналы","channels");
+
+        content=new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        add(root,content,16);
+        renderTabContent();
+        LinearLayout bottom=new LinearLayout(this);
+        bottom.setGravity(Gravity.CENTER);
+        bottom.setPadding(dp(8),dp(10),dp(8),dp(10));
+        bottom.setBackground(glass(0xDD242942,0xCC302B52,22));
+        add(root,bottom,22);
+        Button settings=button("⚙  НАСТРОЙКИ",PANEL2,WHITE);
+        bottom.addView(settings,new LinearLayout.LayoutParams(0,dp(48),1));
+        settings.setOnClickListener(v->showSettings());
+        Button logout=button("ВЫЙТИ",PANEL2,MUTED);
+        LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);
+        lp.leftMargin=dp(8);bottom.addView(logout,lp);
         logout.setOnClickListener(v->{prefs.edit().clear().apply();showAuth();});
         footer();
     }
 
-    private JSONObject request(String method,String path,JSONObject body,String token) throws Exception {
+    private void addTab(LinearLayout row,String title,String key) {
+        Button b=button(title,selectedTab.equals(key)?PURPLE:Color.TRANSPARENT,selectedTab.equals(key)?WHITE:MUTED);
+        LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(42),1);
+        p.setMargins(dp(2),0,dp(2),0);row.addView(b,p);
+        b.setOnClickListener(v->{selectedTab=key;renderHome();});
+    }
+
+    private void renderTabContent() {
+        content.removeAllViews();
+        if("chats".equals(selectedTab)){
+            add(content,label("ПОСЛЕДНИЕ ДИАЛОГИ",10,MUTED,true),0);
+            if(cachedChats.length()==0){emptyState("Пока тихо","Создай диалог, и он появится здесь.");return;}
+            for(int i=0;i<cachedChats.length();i++){
+                JSONObject c=cachedChats.optJSONObject(i);if(c==null)continue;
+                String kind=c.optString("kind","chat");
+                String title=c.optString("title","");
+                if(title.isEmpty())title=kind.equals("direct")?"Личный чат":kind.equals("group")?"Группа":"Приватный канал";
+                addChatCard(title,kind.equals("direct")?"ЛИЧНЫЙ ДИАЛОГ":kind.equals("group")?"ГРУППА":"КАНАЛ",c.optString("role","member"));
+            }
+        }else if("favorites".equals(selectedTab)){
+            emptyState("Избранное","Закреплённые контакты и важные чаты будут здесь.");
+        }else{
+            emptyState("Каналы","Твои приватные каналы будут здесь.");
+        }
+    }
+
+    private void addChatCard(String title,String kind,String role) {
+        LinearLayout card=panel();
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams p=params();p.topMargin=dp(9);content.addView(card,p);
+        TextView avatar=label(initials(title),18,WHITE,true);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setBackground(glass(0xCC604E91,0xCC32718B,50));
+        LinearLayout.LayoutParams ap=new LinearLayout.LayoutParams(dp(48),dp(48));
+        card.addView(avatar,ap);
+        LinearLayout details=new LinearLayout(this);details.setOrientation(1);
+        LinearLayout.LayoutParams dp=new LinearLayout.LayoutParams(0,-2,1);
+        dp.leftMargin=dp(12);card.addView(details,dp);
+        details.addView(label(title,15,WHITE,true));
+        add(details,label(kind+"  ·  "+role,10,MUTED,false),4);
+        TextView arrow=label("›",26,CYAN,false);card.addView(arrow);
+    }
+
+    private void emptyState(String title,String subtitle) {
+        LinearLayout empty=panel();empty.setGravity(Gravity.CENTER);empty.setPadding(dp(20),dp(28),dp(20),dp(28));
+        add(content,empty,8);
+        TextView orb=label("✦",30,CYAN,true);orb.setGravity(Gravity.CENTER);
+        empty.addView(orb);
+        add(empty,label(title,18,WHITE,true),10);
+        add(empty,label(subtitle,12,MUTED,false),5);
+    }
+
+    private void showSettings() {
+        base("НАСТРОЙКИ");
+        LinearLayout panel=panel();add(root,panel,8);
+        add(panel,label("Безопасность",18,WHITE,true),2);
+        add(panel,label("Токен сессии хранится в зашифрованном виде AES-256-GCM. Ключ находится в Android Keystore.",13,MUTED,false),8);
+        add(panel,label("Сквозное шифрование сообщений ещё не подключено. Не отправляй конфиденциальные данные до его завершения.",12,CYAN,false),14);
+        Button back=button("НАЗАД К ЧАТАМ",PURPLE,WHITE);add(panel,back,18);back.setOnClickListener(v->renderHome());
+        footer();
+    }
+
+    private JSONObject request(String method,String path,JSONObject body,String token)throws Exception {
         HttpURLConnection c=(HttpURLConnection)new URL(API+path).openConnection();
-        c.setRequestMethod(method); c.setConnectTimeout(15000); c.setReadTimeout(15000);
+        c.setRequestMethod(method);c.setConnectTimeout(12000);c.setReadTimeout(12000);
         c.setRequestProperty("Accept","application/json");
         if(token!=null)c.setRequestProperty("Authorization","Bearer "+token);
         if(body!=null){c.setDoOutput(true);c.setRequestProperty("Content-Type","application/json; charset=utf-8");try(OutputStream o=c.getOutputStream()){o.write(body.toString().getBytes(StandardCharsets.UTF_8));}}
-        int code=c.getResponseCode(); InputStream in=code>=200&&code<300?c.getInputStream():c.getErrorStream();
-        StringBuilder text=new StringBuilder(); try(BufferedReader r=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){String line;while((line=r.readLine())!=null)text.append(line);}
-        c.disconnect(); JSONObject out=new JSONObject(text.toString());
+        int code=c.getResponseCode();InputStream in=code>=200&&code<300?c.getInputStream():c.getErrorStream();
+        StringBuilder text=new StringBuilder();
+        try(BufferedReader r=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){String line;while((line=r.readLine())!=null)text.append(line);}
+        c.disconnect();JSONObject out=new JSONObject(text.toString());
         if(code<200||code>=300)throw new Exception(out.optString("error","HTTP "+code));
         return out;
     }
 
-    private String validateCredentials(String name,String pass){
-        if(name.isEmpty()) return "Введи ник.";
-        if(name.length()<4) return "Ник слишком короткий. Нужно минимум 4 символа.";
-        if(name.length()>24) return "Ник слишком длинный. Максимум 24 символа.";
-        if(!name.matches("[A-Za-z0-9_]+")) return "В нике разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
-        if(pass.isEmpty()) return "Введи пароль.";
-        if(pass.length()<6) return "Пароль слишком короткий. Нужно минимум 6 символов.";
-        if(pass.length()>8) return "Пароль слишком длинный. Максимум 8 символов.";
-        if(!pass.matches("[A-Za-z0-9_]+")) return "В пароле разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
+    private String validateCredentials(String n,String p){
+        if(n.isEmpty())return "Введи ник.";
+        if(n.length()<4)return "Ник слишком короткий. Нужно минимум 4 символа.";
+        if(n.length()>24)return "Ник слишком длинный. Максимум 24 символа.";
+        if(!n.matches("[A-Za-z0-9_]+"))return "В нике разрешены только английские буквы, цифры и _.";
+        if(p.isEmpty())return "Введи пароль.";
+        if(p.length()<6)return "Пароль слишком короткий. Нужно минимум 6 символов.";
+        if(p.length()>8)return "Пароль слишком длинный. Максимум 8 символов.";
+        if(!p.matches("[A-Za-z0-9_]+"))return "В пароле разрешены только английские буквы, цифры и _.";
         return null;
     }
 
-    private void showStatus(String s){if(status!=null)status.setText(s);}
     private String message(Exception e){
-        String m=e.getMessage();
-        if(m==null)return "Не удалось связаться с сервером.";
-        if(m.contains("username_taken"))return "Этот ник уже занят. Выбери другой.";
-        if(m.contains("username_too_short"))return "Ник слишком короткий. Нужно минимум 4 символа.";
-        if(m.contains("username_too_long"))return "Ник слишком длинный. Максимум 24 символа.";
-        if(m.contains("username_invalid_characters"))return "В нике разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
-        if(m.contains("username_required"))return "Введи ник.";
-        if(m.contains("password_too_short"))return "Пароль слишком короткий. Нужно минимум 6 символов.";
-        if(m.contains("password_too_long"))return "Пароль слишком длинный. Максимум 8 символов.";
-        if(m.contains("password_invalid_characters"))return "В пароле разрешены только английские буквы, цифры и нижнее подчёркивание (_).";
-        if(m.contains("password_required"))return "Введи пароль.";
-        if(m.contains("invalid_credentials"))return "Неверный ник или пароль. Проверь правильность ввода.";
-        if(m.contains("credentials_required"))return "Введи ник и пароль.";
-        if(m.contains("could_not_create_account"))return "Не удалось создать аккаунт из-за ошибки базы данных. Попробуй позже.";
-        if(m.contains("server_error"))return "На сервере произошла внутренняя ошибка. Попробуй позже.";
+        String m=e.getMessage();if(m==null)return "Не удалось связаться с сервером.";
+        if(m.contains("username_taken"))return "Этот ник уже занят.";
+        if(m.contains("invalid_credentials"))return "Неверный ник или пароль.";
         if(m.contains("unauthorized"))return "Сессия завершилась. Войди снова.";
-        String lower=m.toLowerCase();
-        if(lower.contains("unable to resolve host")||lower.contains("failed to connect")||lower.contains("timeout")||lower.contains("network is unreachable"))return "Нет соединения с сервером. Проверь интернет.";
-        return "Не удалось выполнить запрос. Попробуй ещё раз.";
+        if(m.contains("timeout")||m.contains("failed to connect")||m.contains("Unable to resolve host"))return "Нет соединения с сервером. Проверь интернет.";
+        if(m.contains("username_too_short"))return "Ник слишком короткий.";
+        if(m.contains("username_too_long"))return "Ник слишком длинный.";
+        if(m.contains("username_invalid_characters"))return "В нике разрешены только английские буквы, цифры и _.";
+        if(m.contains("password_too_short"))return "Пароль слишком короткий.";
+        if(m.contains("password_too_long"))return "Пароль слишком длинный.";
+        if(m.contains("password_invalid_characters"))return "В пароле разрешены только английские буквы, цифры и _.";
+        if(m.contains("server_error"))return "Ошибка на сервере. Попробуй позже.";
+        return "Не удалось выполнить запрос: "+m;
     }
-    private void hideKeyboard(){try{((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(password.getWindowToken(),0);}catch(Exception ignored){}}
-    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(color==ACID?BG:Color.WHITE);b.setTextSize(13);b.setAllCaps(false);b.setBackgroundColor(color);return b;}
-    private View card(String title,String sub){LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(15),dp(14),dp(15),dp(14));box.setBackgroundColor(PANEL);LinearLayout.LayoutParams p=params();p.topMargin=dp(9);box.setLayoutParams(p);box.addView(label(title,16,Color.WHITE,true));add(box,label(sub,11,MUTED,false),4);return box;}
-    private void footer(){TextView f=label("K.C.H.  •  FOUNDATION BUILD",10,MUTED,false);f.setGravity(Gravity.CENTER);add(root,f,32);TextView c=label("kach0ta  ·  vo1dka  ·  r3z0n  ·  a1r1s",8,Color.rgb(83,78,94),false);c.setGravity(Gravity.CENTER);c.setAlpha(.55f);add(root,c,10);}
-    private TextView label(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
-    private void add(LinearLayout p,View v,int top){LinearLayout.LayoutParams lp=params();lp.topMargin=dp(top);p.addView(v,lp);}
+
+    private LinearLayout panel(){
+        LinearLayout p=new LinearLayout(this);p.setOrientation(LinearLayout.VERTICAL);
+        p.setPadding(dp(16),dp(16),dp(16),dp(16));
+        p.setBackground(glass(0xD9272D49,0xCC292744,22));
+        return p;
+    }
+    private EditText field(String hint,boolean secret){
+        EditText e=new EditText(this);e.setSingleLine(true);e.setHint(hint);
+        e.setTextColor(WHITE);e.setHintTextColor(MUTED);e.setTextSize(14);
+        e.setPadding(dp(15),dp(11),dp(15),dp(11));
+        e.setBackground(glass(0xCC171B2C,0xCC252A43,16));
+        if(secret)e.setInputType(129);
+        return e;
+    }
+    private Button button(String text,int color,int textColor){
+        Button b=new Button(this);b.setText(text);b.setTextColor(textColor);b.setTextSize(12);
+        b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setAllCaps(false);
+        b.setPadding(dp(12),0,dp(12),0);b.setMinHeight(dp(46));b.setBackground(glass(color,color,18));
+        return b;
+    }
+    private GradientDrawable glass(int top,int bottom,int radius){
+        GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{top,bottom});
+        d.setCornerRadius(dp(radius));d.setStroke(dp(1),0x447E9CCB);return d;
+    }
+    private String initials(String s){if(s==null||s.isEmpty())return "K";return s.substring(0,1).toUpperCase();}
+    private TextView label(String s,int size,int color,boolean bold){
+        TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);
+        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;
+    }
+    private void add(LinearLayout p,View v,int top){
+        LinearLayout.LayoutParams lp=params();lp.topMargin=dp(top);p.addView(v,lp);
+    }
     private LinearLayout.LayoutParams params(){return new LinearLayout.LayoutParams(-1,-2);}
     private int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
+    private void showStatus(String s){if(status!=null)status.setText(s);}
+    private void hideKeyboard(){
+        try{((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(password.getWindowToken(),0);}
+        catch(Exception ignored){}
+    }
+    private void footer(){
+        TextView f=label("K.C.H.  •  FOUNDATION BUILD",9,MUTED,false);f.setGravity(Gravity.CENTER);add(root,f,26);
+        TextView c=label("kach0ta  ·  vo1dka  ·  r3z0n  ·  a1r1s",8,Color.rgb(102,105,130),false);
+        c.setGravity(Gravity.CENTER);c.setAlpha(.65f);add(root,c,8);
+    }
     @Override protected void onDestroy(){super.onDestroy();io.shutdown();}
 }
