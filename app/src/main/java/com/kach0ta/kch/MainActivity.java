@@ -29,6 +29,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -230,12 +234,15 @@ public final class MainActivity extends Activity {
         if("chats".equals(selectedTab)){
             add(content,label("ПОСЛЕДНИЕ ДИАЛОГИ",10,MUTED,true),0);
             if(cachedChats.length()==0){emptyState("Пока тихо","Создай диалог, и он появится здесь.");return;}
-            for(int i=0;i<cachedChats.length();i++){
-                JSONObject c=cachedChats.optJSONObject(i);if(c==null)continue;
+            ArrayList<JSONObject> ordered=new ArrayList<>();
+            for(int i=0;i<cachedChats.length();i++){JSONObject c=cachedChats.optJSONObject(i);if(c!=null)ordered.add(c);}
+            Set<String> pinned=prefs.getStringSet("pinned_chats",new HashSet<>());
+            Collections.sort(ordered,(a,b)->Boolean.compare(pinned.contains(b.optString("id")),pinned.contains(a.optString("id"))));
+            for(JSONObject c:ordered){
                 String kind=c.optString("kind","chat");
                 String title=c.optString("title","");
                 if(title.isEmpty())title=kind.equals("direct")?"Личный чат":kind.equals("group")?"Группа":"Приватный канал";
-                addChatCard(title,kind.equals("direct")?"ЛИЧНЫЙ ДИАЛОГ":kind.equals("group")?"ГРУППА":"КАНАЛ",c.optString("role","member"));
+                addChatCard(c.optString("id"),title,kind.equals("direct")?"ЛИЧНЫЙ ДИАЛОГ":kind.equals("group")?"ГРУППА":"КАНАЛ",c.optString("role","member"));
             }
         }else if("favorites".equals(selectedTab)){
             emptyState("Избранное","Твои заметки и сообщения самому себе.");
@@ -246,7 +253,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void addChatCard(String title,String kind,String role) {
+    private void addChatCard(String id,String title,String kind,String role) {
         LinearLayout card=panel();
         card.setOrientation(LinearLayout.HORIZONTAL);
         card.setGravity(Gravity.CENTER_VERTICAL);
@@ -261,7 +268,8 @@ public final class MainActivity extends Activity {
         dp.leftMargin=dp(12);card.addView(details,dp);
         details.addView(label(title,15,WHITE,true));
         add(details,label(kind+"  ·  "+role,10,MUTED,false),4);
-        TextView arrow=label("›",26,CYAN,false);card.addView(arrow);
+        TextView arrow=label(prefs.getStringSet("pinned_chats",new HashSet<>()).contains(id)?"⌖":"›",22,CYAN,false);card.addView(arrow);
+        card.setOnLongClickListener(v->{Set<String> saved=new HashSet<>(prefs.getStringSet("pinned_chats",new HashSet<>()));if(saved.contains(id))saved.remove(id);else saved.add(id);prefs.edit().putStringSet("pinned_chats",saved).apply();renderHome();return true;});
     }
 
     private void emptyState(String title,String subtitle) {
