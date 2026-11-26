@@ -71,6 +71,15 @@ The exact handshake transcript, key schedule, failure handling and test vectors 
 
 This does **not** provide a usable asynchronous handshake. The matching private prekey is not persisted by this class, the server has no prekey publication/consumption endpoints, no one-time prekeys are implemented, and identity trust still requires fingerprint verification. Do not upload or rely on these bundles in live chats yet. Before use, the API must enforce uniqueness, expiry, replacement and atomic one-time-prekey consumption.
 
+
+### Local signed-prekey persistence prototype
+
+`LocalPreKeyStore.java` now creates or reloads one P-256 signed prekey per caller-supplied key ID. The private PKCS#8 bytes are encrypted with the device-local AES-GCM key held by Android Keystore, with associated data binding the account ID, device ID, key ID, expiry and public key. The encrypted record is committed to private app storage; a reused key ID with changed metadata is rejected rather than silently overwritten. The class verifies the stored identity signature and checks that the restored private/public key pair matches.
+
+Limitations: for API 23 compatibility this prototype generates the ECDH pair in app process memory and encrypts its private encoding at rest; it is not a non-exportable hardware-backed ECDH key. Key bytes necessarily exist briefly in process memory when loaded. There is no secure deletion guarantee for flash storage, no rotation scheduler, no server publication, and no one-time-prekey pool. Do not use this as a production session protocol.
+
+The Settings diagnostic uses a dedicated local-only test key ID and a far-future expiry so repeated tests verify persistence rather than generating a new key each time. It does not publish this test key.
+
 ### Per-message protection
 
 A live messaging protocol still needs a reviewed state machine for:
