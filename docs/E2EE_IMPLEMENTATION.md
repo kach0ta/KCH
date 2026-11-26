@@ -8,11 +8,16 @@ The existing `Aes256Gcm` helper protects one installation's session token with A
 
 ## Protocol choice
 
-Do not invent a key exchange, ratchet, group protocol, or identity format. Integrate a maintained Signal Protocol implementation (libsignal) after confirming:
-- a supported Android/JVM artifact and its exact pinned version;
-- Android API 23 compatibility and Termux build feasibility;
-- upstream license and redistribution requirements;
-- reproducible build and known test vectors.
+The current upstream libsignal project exposes Java/Android APIs backed by Rust/JNI and publishes Android AAR artifacts. Its upstream README explicitly says use outside Signal is unsupported and the project is AGPLv3. K.C.H. must account for that license before distributing an app that bundles it. The current Termux APK builder is a custom javac/aapt/d8 pipeline and cannot consume an AAR or package its native JNI libraries yet; a compatible dependency-aware build step is required.
+
+Do not invent a key exchange, ratchet, group protocol, or identity format. Before adding libsignal, confirm:
+- a pinned, reproducible artifact version and its matching Android/JNI dependencies;
+- Android API 23 compatibility and ABI coverage for the target phones;
+- AGPLv3 compatibility with K.C.H.'s intended distribution;
+- a build process that packages the native libraries correctly;
+- interoperability tests and known test vectors.
+
+If these constraints cannot be met, stop and evaluate another maintained, audited protocol implementation with a compatible license. Do not replace this with a home-grown ratchet.
 
 Use the protocol implementation for one-to-one message sessions, authenticated prekey/session establishment, identity keys, signed prekeys, one-time prekeys, and ratcheting. Group messaging must use a protocol-supported group design (for example, the implementation's Sender Keys support) rather than a home-grown shared AES key. Never fall back to plaintext if crypto setup fails.
 
@@ -50,3 +55,7 @@ Message plaintext must be encrypted by the established Signal session. The API s
 - Implemented in this branch: AES-256-GCM binary blob primitive with random 96-bit nonce, 128-bit tag, context AAD, strict key length and versioned envelope.
 - Not implemented: Signal/libsignal sessions, identity/prekeys, key verification, server key endpoints, blob upload/download, avatar key distribution, encrypted message UI, group key management.
 - Do not use this branch for sensitive communication or claim that K.C.H. is E2EE yet.
+
+## Data lifecycle
+
+See [DATA_RETENTION.md](DATA_RETENTION.md). Deleted messages are physically removed from the active SQLite database by the new message-specific DELETE endpoint. Expired sessions are pruned periodically. Legacy plaintext avatar fields are cleared and plaintext avatar writes are rejected. SQLite secure-delete and WAL checkpoints reduce retained database copies but cannot guarantee erasure from flash storage, provider snapshots or downloaded client copies.
