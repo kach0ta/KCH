@@ -233,6 +233,7 @@ public final class MainActivity extends Activity {
         content.removeAllViews();
         if("chats".equals(selectedTab)){
             add(content,label("ПОСЛЕДНИЕ ДИАЛОГИ",10,MUTED,true),0);
+            add(content,label("Удерживай чат, чтобы закрепить его вверху списка.",10,MUTED,false),4);
             if(cachedChats.length()==0){emptyState("Пока тихо","Создай диалог, и он появится здесь.");return;}
             ArrayList<JSONObject> ordered=new ArrayList<>();
             for(int i=0;i<cachedChats.length();i++){JSONObject c=cachedChats.optJSONObject(i);if(c!=null)ordered.add(c);}
@@ -349,7 +350,7 @@ public final class MainActivity extends Activity {
                     String b64=Base64.encodeToString(bytes,Base64.NO_WRAP);
                     JSONObject body=new JSONObject();body.put("avatar",b64);
                     JSONObject updated=request("POST","/v1/me/profile",body,sessionToken());myProfile=updated;
-                    runOnUiThread(()->android.widget.Toast.makeText(this,"Фото профиля обновлено",android.widget.Toast.LENGTH_SHORT).show());
+                    runOnUiThread(this::showAccount);
                 }catch(Exception e){runOnUiThread(()->android.widget.Toast.makeText(this,message(e),android.widget.Toast.LENGTH_LONG).show());}
             });
         }
