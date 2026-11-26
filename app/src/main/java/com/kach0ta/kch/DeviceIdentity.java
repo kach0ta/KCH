@@ -7,7 +7,6 @@ import android.util.Base64;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.KeyFactory;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.MessageDigest;
@@ -15,7 +14,6 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.ECGenParameterSpec;
-import java.security.spec.X509EncodedKeySpec;
 
 /**
  * Per-installation device identity key backed by Android Keystore.
@@ -44,7 +42,7 @@ public final class DeviceIdentity {
      */
     public static byte[] getOrCreatePublicKey() throws GeneralSecurityException {
         KeyStore store = loadStore();
-        if (!store.containsAlias(ALIAS)) {
+        if (!hasAlias(store)) {
             generateIdentityKey();
             store = loadStore();
         }
@@ -68,7 +66,7 @@ public final class DeviceIdentity {
             throws GeneralSecurityException {
         validatePurposeAndPayload(purpose, payload);
         KeyStore store = loadStore();
-        if (!store.containsAlias(ALIAS)) {
+        if (!hasAlias(store)) {
             getOrCreatePublicKey();
             store = loadStore();
         }
@@ -152,6 +150,14 @@ public final class DeviceIdentity {
                  | java.security.KeyStoreException
                  | java.security.NoSuchAlgorithmException e) {
             throw new GeneralSecurityException("Unable to load Android Keystore", e);
+        }
+    }
+
+    private static boolean hasAlias(KeyStore store) throws GeneralSecurityException {
+        try {
+            return store.containsAlias(ALIAS);
+        } catch (java.security.KeyStoreException e) {
+            throw new GeneralSecurityException("Unable to inspect device identity key", e);
         }
     }
 
