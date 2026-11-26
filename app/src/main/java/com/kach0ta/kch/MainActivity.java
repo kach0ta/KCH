@@ -1,6 +1,10 @@
 package com.kach0ta.kch;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.graphics.BitmapFactory;
+import android.util.Base64;
+import android.widget.ImageView;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -42,6 +46,8 @@ public final class MainActivity extends Activity {
     private TextView status;
     private JSONArray cachedChats=new JSONArray();
     private String selectedTab="chats";
+    private static final int PICK_AVATAR=701;
+    private JSONObject myProfile=new JSONObject();
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
@@ -95,7 +101,6 @@ public final class MainActivity extends Activity {
         add(panel,status,12);
         login.setOnClickListener(v->authenticate(false));
         register.setOnClickListener(v->authenticate(true));
-        add(root,label("AES-256-GCM · ЛОКАЛЬНЫЙ КЛЮЧ ANDROID KEYSTORE",9,MUTED,true),20);
         footer();
     }
 
@@ -186,8 +191,8 @@ public final class MainActivity extends Activity {
 
         LinearLayout tabs=new LinearLayout(this);
         tabs.setOrientation(LinearLayout.HORIZONTAL);
-        tabs.setPadding(dp(4),dp(4),dp(4),dp(4));
-        tabs.setBackground(glass(0xAA20243A,0xAA292B49,20));
+        tabs.setPadding(dp(3),dp(3),dp(3),dp(3));
+        tabs.setBackground(glass(0x6620243A,0x66292B49,24));
         add(root,tabs,14);
         addTab(tabs,"Чаты","chats");
         addTab(tabs,"Избранное","favorites");
@@ -202,18 +207,19 @@ public final class MainActivity extends Activity {
         bottom.setPadding(dp(8),dp(10),dp(8),dp(10));
         bottom.setBackground(glass(0xDD242942,0xCC302B52,22));
         add(root,bottom,22);
+        Button account=button("◉  МОЙ ПРОФИЛЬ",PANEL2,WHITE);
+        bottom.addView(account,new LinearLayout.LayoutParams(0,dp(48),1));
+        account.setOnClickListener(v->showAccount());
         Button settings=button("⚙  НАСТРОЙКИ",PANEL2,WHITE);
-        bottom.addView(settings,new LinearLayout.LayoutParams(0,dp(48),1));
-        settings.setOnClickListener(v->showSettings());
-        Button logout=button("ВЫЙТИ",PANEL2,MUTED);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);
-        lp.leftMargin=dp(8);bottom.addView(logout,lp);
-        logout.setOnClickListener(v->{prefs.edit().clear().apply();showAuth();});
+        lp.leftMargin=dp(8);bottom.addView(settings,lp);
+        settings.setOnClickListener(v->showSettings());
         footer();
     }
 
     private void addTab(LinearLayout row,String title,String key) {
-        Button b=button(title,selectedTab.equals(key)?PURPLE:Color.TRANSPARENT,selectedTab.equals(key)?WHITE:MUTED);
+        Button b=button(title,selectedTab.equals(key)?0xAA69549A:Color.TRANSPARENT,selectedTab.equals(key)?WHITE:MUTED);
+        b.setBackground(glass(selectedTab.equals(key)?0xAA69549A:0x0020243A,selectedTab.equals(key)?0xAA51447E:0x0020243A,22));
         LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(0,dp(42),1);
         p.setMargins(dp(2),0,dp(2),0);row.addView(b,p);
         b.setOnClickListener(v->{selectedTab=key;renderHome();});
@@ -232,7 +238,9 @@ public final class MainActivity extends Activity {
                 addChatCard(title,kind.equals("direct")?"ЛИЧНЫЙ ДИАЛОГ":kind.equals("group")?"ГРУППА":"КАНАЛ",c.optString("role","member"));
             }
         }else if("favorites".equals(selectedTab)){
-            emptyState("Избранное","Закреплённые контакты и важные чаты будут здесь.");
+            emptyState("Избранное","Твои заметки и сообщения самому себе.");
+            Button self=button("ОТКРЫТЬ МОЙ ЧАТ",PURPLE,WHITE);add(content,self,10);
+            self.setOnClickListener(v->openSelfChat());
         }else{
             emptyState("Каналы","Твои приватные каналы будут здесь.");
         }
@@ -268,11 +276,90 @@ public final class MainActivity extends Activity {
     private void showSettings() {
         base("НАСТРОЙКИ");
         LinearLayout panel=panel();add(root,panel,8);
-        add(panel,label("Безопасность",18,WHITE,true),2);
-        add(panel,label("Токен сессии хранится в зашифрованном виде AES-256-GCM. Ключ находится в Android Keystore.",13,MUTED,false),8);
-        add(panel,label("Сквозное шифрование сообщений ещё не подключено. Не отправляй конфиденциальные данные до его завершения.",12,CYAN,false),14);
+        add(panel,label("Внешний вид",18,WHITE,true),2);
+        add(panel,label("Тёмная тема K.C.H. с мягкими стеклянными элементами.",13,MUTED,false),8);
+        add(panel,label("Уведомления и приватность появятся здесь по мере подключения функций.",12,MUTED,false),14);
         Button back=button("НАЗАД К ЧАТАМ",PURPLE,WHITE);add(panel,back,18);back.setOnClickListener(v->renderHome());
         footer();
+    }
+
+
+    private void showAccount() {
+        base("МОЙ ПРОФИЛЬ");
+        LinearLayout card=panel();add(root,card,8);
+        ImageView avatar=new ImageView(this);
+        avatar.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        avatar.setBackground(glass(0xCC604E91,0xCC32718B,60));
+        avatar.setClipToOutline(true);
+        LinearLayout.LayoutParams avp=new LinearLayout.LayoutParams(dp(104),dp(104));
+        avp.gravity=Gravity.CENTER;card.addView(avatar,avp);
+        String encoded=myProfile.optString("avatar","");
+        if(!encoded.isEmpty()){
+            try{byte[] bytes=Base64.decode(encoded,Base64.DEFAULT);avatar.setImageBitmap(BitmapFactory.decodeByteArray(bytes,0,bytes.length));}
+            catch(Exception ignored){}
+        }
+        Button change=button("ИЗМЕНИТЬ ФОТО",PANEL2,WHITE);add(card,change,12);
+        change.setOnClickListener(v->pickAvatar());
+        add(card,label("Ник",12,MUTED,true),18);
+        EditText nick=field("Ник",false);nick.setText(prefs.getString("username",""));add(card,nick,6);
+        add(card,label("Отображаемое имя",12,MUTED,true),12);
+        EditText display=field("Как тебя видят другие",false);display.setText(myProfile.optString("displayName",prefs.getString("username","")));add(card,display,6);
+        Button save=button("СОХРАНИТЬ ИЗМЕНЕНИЯ",PURPLE,WHITE);add(card,save,16);
+        TextView info=label("Фото до 5 МБ. Ник: английские буквы, цифры и подчёркивание.",11,MUTED,false);add(card,info,10);
+        save.setOnClickListener(v->{
+            String n=nick.getText().toString().trim();
+            if(n.length()<4||n.length()>24||!n.matches("[A-Za-z0-9_]+")){info.setText("Проверь ник: от 4 до 24 символов, только A–Z, 0–9 и _.");return;}
+            JSONObject body=new JSONObject();
+            try{body.put("username",n);body.put("displayName",display.getText().toString().trim());}catch(Exception ignored){}
+            saveProfile(body,info);
+        });
+        Button back=button("НАЗАД К ЧАТАМ",PANEL2,WHITE);add(card,back,10);back.setOnClickListener(v->renderHome());
+        footer();
+        io.execute(()->{try{JSONObject me=request("GET","/v1/me",null,sessionToken());myProfile=me;runOnUiThread(()->{if(!isFinishing())showAccount();});}catch(Exception ignored){}});
+    }
+
+    private void pickAvatar() {
+        Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("image/*");i.addCategory(Intent.CATEGORY_OPENABLE);
+        startActivityForResult(i,PICK_AVATAR);
+    }
+
+    @Override protected void onActivityResult(int requestCode,int resultCode,Intent data) {
+        super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode==PICK_AVATAR&&resultCode==RESULT_OK&&data!=null&&data.getData()!=null){
+            io.execute(()->{
+                try(InputStream in=getContentResolver().openInputStream(data.getData())){
+                    byte[] bytes=readLimited(in,5*1024*1024);
+                    String b64=Base64.encodeToString(bytes,Base64.NO_WRAP);
+                    JSONObject body=new JSONObject();body.put("avatar",b64);
+                    JSONObject updated=request("POST","/v1/me/profile",body,sessionToken());myProfile=updated;
+                    runOnUiThread(()->showAccount());
+                }catch(Exception e){runOnUiThread(()->showStatus(message(e)));}
+            });
+        }
+    }
+
+    private byte[] readLimited(InputStream in,int max)throws Exception {
+        java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream();byte[] b=new byte[8192];int n,total=0;
+        while((n=in.read(b))!=-1){total+=n;if(total>max)throw new Exception("avatar_too_large");out.write(b,0,n);}
+        return out.toByteArray();
+    }
+
+    private void saveProfile(JSONObject body,TextView info) {
+        io.execute(()->{try{
+            JSONObject updated=request("POST","/v1/me/profile",body,sessionToken());myProfile=updated;
+            String name=updated.optString("username",prefs.getString("username",""));
+            prefs.edit().putString("username",name).apply();
+            runOnUiThread(()->{info.setText("Профиль сохранён.");});
+        }catch(Exception e){runOnUiThread(()->info.setText(message(e)));}});
+    }
+
+    private void openSelfChat() {
+        showStatus("Открываем личное пространство…");
+        io.execute(()->{try{
+            JSONObject body=new JSONObject();body.put("kind","direct");body.put("self",true);
+            JSONObject result=request("POST","/v1/conversations",body,sessionToken());
+            runOnUiThread(()->{showStatus("Личный чат создан: "+result.optString("id"));loadChats();});
+        }catch(Exception e){runOnUiThread(()->showStatus(message(e)));}});
     }
 
     private JSONObject request(String method,String path,JSONObject body,String token)throws Exception {
@@ -304,6 +391,7 @@ public final class MainActivity extends Activity {
     private String message(Exception e){
         String m=e.getMessage();if(m==null)return "Не удалось связаться с сервером.";
         if(m.contains("username_taken"))return "Этот ник уже занят.";
+        if(m.contains("avatar_too_large"))return "Фото больше 5 МБ. Выбери файл поменьше.";
         if(m.contains("invalid_credentials"))return "Неверный ник или пароль.";
         if(m.contains("unauthorized"))return "Сессия завершилась. Войди снова.";
         if(m.contains("timeout")||m.contains("failed to connect")||m.contains("Unable to resolve host"))return "Нет соединения с сервером. Проверь интернет.";
@@ -339,7 +427,9 @@ public final class MainActivity extends Activity {
     }
     private GradientDrawable glass(int top,int bottom,int radius){
         GradientDrawable d=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{top,bottom});
-        d.setCornerRadius(dp(radius));d.setStroke(dp(1),0x447E9CCB);return d;
+        d.setCornerRadius(dp(radius));
+        if((top>>>24)!=0)d.setStroke(dp(1),0x227E9CCB);
+        return d;
     }
     private String initials(String s){if(s==null||s.isEmpty())return "K";return s.substring(0,1).toUpperCase();}
     private TextView label(String s,int size,int color,boolean bold){
