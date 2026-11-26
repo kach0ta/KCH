@@ -190,7 +190,7 @@ const server = createServer(async (req, res) => {
       return reply(res, { id, kind: d.kind, title }, 201);
     }
 
-    const match = path.match(/^\\/v1\\/conversations\\/([0-9a-f-]+)\\/messages$/i);
+    const match = path.match(/^\/v1\/conversations\/([0-9a-f-]+)\/messages$/i);
     if (match) {
       const conversationId = match[1];
       const member = db.prepare("SELECT 1 FROM conversation_members WHERE conversation_id = ? AND user_id = ?")
