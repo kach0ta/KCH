@@ -54,7 +54,10 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_created ON messages(conversation_id, created_at);
-`);
+);
+
+const userColumns = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+if (!userColumns.includes("avatar_data")) db.exec("ALTER TABLE users ADD COLUMN avatar_data TEXT");
 
 const now = () => Math.floor(Date.now() / 1000);
 const token = (n = 32) => randomBytes(n).toString("base64url");
@@ -76,11 +79,11 @@ function reply(res, value, status = 200) {
 function error(res, code, status = 400) {
   reply(res, { error: code }, status);
 }
-async function readJson(req) {
+async function readJson(req, maxBytes = 65536) {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 65536) throw new Error("body_too_large");
+    if (body.length > maxBytes) throw new Error("body_too_large");
   }
   try { return JSON.parse(body || "null"); } catch { return null; }
 }
@@ -88,7 +91,7 @@ function currentUser(req) {
   const raw = req.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (!raw) return null;
   return db.prepare(`
-    SELECT u.id, u.username, u.display_name
+    SELECT u.id, u.username, u.display_name, u.avatar_data
     FROM sessions s JOIN users u ON u.id = s.user_id
     WHERE s.token_hash = ? AND s.expires_at > ? AND u.disabled_at IS NULL
   `).get(sha(raw), now()) || null;
@@ -166,7 +169,43 @@ const server = createServer(async (req, res) => {
     if (!me) return error(res, "unauthorized", 401);
 
     if (req.method === "GET" && path === "/v1/me") {
-      return reply(res, { id: me.id, username: me.username, displayName: me.display_name });
+      return reply(res, { id: me.id, username: me.username, displayName: me.display_name, avatar: me.avatar_data || "" });
+    }
+
+    if (req.method === "POST" && path === "/v1/me/profile") {
+      const d = await readJson(req, 7 * 1024 * 1024);
+      if (!d || typeof d !== "object") return error(res, "invalid_profile");
+      let username = me.username;
+      let displayName = me.display_name;
+      if (d.username !== undefined) {
+        if (typeof d.username !== "string" || d.username.length < 4 || d.username.length > 24 || !/^[A-Za-z0-9_]+$/.test(d.username)) {
+          return error(res, "username_invalid");
+        }
+        username = d.username.toLowerCase();
+        const exists = db.prepare("SELECT id FROM users WHERE username = ? AND id <> ?").get(username, me.id);
+        if (exists) return error(res, "username_taken", 409);
+      }
+      if (d.displayName !== undefined) {
+        if (typeof d.displayName !== "string" || !d.displayName.trim() || d.displayName.trim().length > 32) {
+          return error(res, "display_name_invalid");
+        }
+        displayName = d.displayName.trim();
+      }
+      let avatar = me.avatar_data || "";
+      if (d.avatar !== undefined) {
+        if (typeof d.avatar !== "string") return error(res, "avatar_invalid");
+        if (d.avatar.length > 7 * 1024 * 1024) return error(res, "avatar_too_large", 413);
+        const raw = Buffer.from(d.avatar, "base64");
+        if (raw.length > 5 * 1024 * 1024) return error(res, "avatar_too_large", 413);
+        const valid = (raw[0] === 0xFF && raw[1] === 0xD8 && raw[2] === 0xFF) ||
+          (raw[0] === 0x89 && raw[1] === 0x50 && raw[2] === 0x4E && raw[3] === 0x47) ||
+          (raw.toString("ascii", 0, 4) === "RIFF" && raw.toString("ascii", 8, 12) === "WEBP");
+        if (!valid) return error(res, "avatar_format_invalid");
+        avatar = d.avatar;
+      }
+      db.prepare("UPDATE users SET username = ?, display_name = ?, avatar_data = ? WHERE id = ?")
+        .run(username, displayName, avatar, me.id);
+      return reply(res, { id: me.id, username, displayName, avatar });
     }
 
     if (req.method === "GET" && path === "/v1/conversations") {
@@ -183,7 +222,17 @@ const server = createServer(async (req, res) => {
       if (!d || !["direct", "group", "channel"].includes(d.kind)) return error(res, "invalid_kind");
       const raw = Array.isArray(d.members) ? d.members.filter(x => typeof x === "string").slice(0, 49) : [];
       const members = [...new Set([me.id, ...raw])];
-      if (d.kind === "direct" && members.length !== 2) return error(res, "direct_chat_requires_two_members");
+      const selfChat = d.self === true && d.kind === "direct";
+      if (selfChat) {
+        const existing = db.prepare(`
+          SELECT c.id FROM conversations c
+          JOIN conversation_members m ON m.conversation_id = c.id
+          WHERE c.kind = 'direct' AND m.user_id = ?
+          GROUP BY c.id HAVING COUNT(*) = 1 LIMIT 1
+        `).get(me.id);
+        if (existing) return reply(res, { id: existing.id, kind: "direct", title: "Избранное", existing: true });
+        members.splice(0, members.length, me.id);
+      } else if (d.kind === "direct" && members.length !== 2) return error(res, "direct_chat_requires_two_members");
       const placeholders = members.map(() => "?").join(",");
       const found = db.prepare(`SELECT id FROM users WHERE disabled_at IS NULL AND id IN (${placeholders})`).all(...members);
       if (found.length !== members.length) return error(res, "unknown_member", 404);
