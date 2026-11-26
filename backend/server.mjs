@@ -248,7 +248,7 @@ const server = createServer(async (req, res) => {
       return reply(res, { id: me.id, username, displayName, avatarCiphertext, avatarMime, avatarVersion, avatarUpdatedAt });
     }
 
-    const avatarKeyMatch = path.match(/^\\/v1\\/me\\/avatar-keys\\/([0-9a-f-]+)$/i);
+    const avatarKeyMatch = path.match(/^\/v1\/me\/avatar-keys\/([0-9a-f-]+)$/i);
     if (avatarKeyMatch && req.method === "POST") {
       const recipientId = avatarKeyMatch[1];
       if (recipientId === me.id) return error(res, "invalid_avatar_recipient");
@@ -268,7 +268,7 @@ const server = createServer(async (req, res) => {
       return reply(res, { ok: true, avatarVersion: current.avatar_version });
     }
 
-    const profileMatch = path.match(/^\\/v1\\/users\\/([0-9a-f-]+)\\/profile$/i);
+    const profileMatch = path.match(/^\/v1\/users\/([0-9a-f-]+)\/profile$/i);
     if (profileMatch && req.method === "GET") {
       const ownerId = profileMatch[1];
       const shared = db.prepare("SELECT 1 FROM conversation_members a JOIN conversation_members b ON a.conversation_id = b.conversation_id WHERE a.user_id = ? AND b.user_id = ? LIMIT 1")
