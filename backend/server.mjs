@@ -51,6 +51,16 @@ CREATE TABLE IF NOT EXISTS conversation_members (
   PRIMARY KEY (conversation_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_conversation_members_user ON conversation_members(user_id, conversation_id);
+CREATE TABLE IF NOT EXISTS avatar_key_envelopes (
+  owner_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  avatar_version INTEGER NOT NULL,
+  envelope_ciphertext TEXT NOT NULL CHECK (length(envelope_ciphertext) BETWEEN 16 AND 12000),
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (owner_user_id, recipient_user_id, avatar_version),
+  CHECK (owner_user_id <> recipient_user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_avatar_key_envelopes_recipient ON avatar_key_envelopes(recipient_user_id, owner_user_id);
 CREATE TABLE IF NOT EXISTS messages (
   id TEXT PRIMARY KEY NOT NULL,
   conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
@@ -231,8 +241,50 @@ const server = createServer(async (req, res) => {
       }
       db.prepare("UPDATE users SET username = ?, display_name = ?, avatar_ciphertext = ?, avatar_mime = ?, avatar_version = ?, avatar_updated_at = ?, avatar_data = NULL WHERE id = ?")
         .run(username, displayName, avatarCiphertext || null, avatarMime || null, avatarVersion, avatarUpdatedAt, me.id);
+      if (avatarVersion !== (me.avatar_version || 0)) {
+        db.prepare("DELETE FROM avatar_key_envelopes WHERE owner_user_id = ?").run(me.id);
+      }
       checkpointStorage();
       return reply(res, { id: me.id, username, displayName, avatarCiphertext, avatarMime, avatarVersion, avatarUpdatedAt });
+    }
+
+    const avatarKeyMatch = path.match(/^\\/v1\\/me\\/avatar-keys\\/([0-9a-f-]+)$/i);
+    if (avatarKeyMatch && req.method === "POST") {
+      const recipientId = avatarKeyMatch[1];
+      if (recipientId === me.id) return error(res, "invalid_avatar_recipient");
+      const recipient = db.prepare("SELECT id FROM users WHERE id = ? AND disabled_at IS NULL").get(recipientId);
+      if (!recipient) return error(res, "unknown_member", 404);
+      const shared = db.prepare("SELECT 1 FROM conversation_members a JOIN conversation_members b ON a.conversation_id = b.conversation_id WHERE a.user_id = ? AND b.user_id = ? LIMIT 1")
+        .get(me.id, recipientId);
+      if (!shared) return error(res, "not_found", 404);
+      const d = await readJson(req, 20000);
+      if (!d || typeof d.envelopeCiphertext !== "string" || d.envelopeCiphertext.length < 16 || d.envelopeCiphertext.length > 12000) {
+        return error(res, "avatar_key_envelope_invalid");
+      }
+      const current = db.prepare("SELECT avatar_version, avatar_ciphertext FROM users WHERE id = ?").get(me.id);
+      if (!current?.avatar_ciphertext || d.avatarVersion !== current.avatar_version) return error(res, "avatar_version_mismatch", 409);
+      db.prepare("INSERT INTO avatar_key_envelopes(owner_user_id,recipient_user_id,avatar_version,envelope_ciphertext,created_at) VALUES(?,?,?,?,?) ON CONFLICT(owner_user_id,recipient_user_id,avatar_version) DO UPDATE SET envelope_ciphertext = excluded.envelope_ciphertext, created_at = excluded.created_at")
+        .run(me.id, recipientId, current.avatar_version, d.envelopeCiphertext, now());
+      return reply(res, { ok: true, avatarVersion: current.avatar_version });
+    }
+
+    const profileMatch = path.match(/^\\/v1\\/users\\/([0-9a-f-]+)\\/profile$/i);
+    if (profileMatch && req.method === "GET") {
+      const ownerId = profileMatch[1];
+      const shared = db.prepare("SELECT 1 FROM conversation_members a JOIN conversation_members b ON a.conversation_id = b.conversation_id WHERE a.user_id = ? AND b.user_id = ? LIMIT 1")
+        .get(me.id, ownerId);
+      if (!shared) return error(res, "not_found", 404);
+      const profile = db.prepare("SELECT id,username,display_name,avatar_ciphertext,avatar_mime,avatar_version,avatar_updated_at FROM users WHERE id = ? AND disabled_at IS NULL")
+        .get(ownerId);
+      if (!profile) return error(res, "not_found", 404);
+      const key = db.prepare("SELECT envelope_ciphertext FROM avatar_key_envelopes WHERE owner_user_id = ? AND recipient_user_id = ? AND avatar_version = ?")
+        .get(ownerId, me.id, profile.avatar_version);
+      return reply(res, {
+        id: profile.id, username: profile.username, displayName: profile.display_name,
+        avatarCiphertext: profile.avatar_ciphertext || "", avatarMime: profile.avatar_mime || "",
+        avatarVersion: profile.avatar_version || 0, avatarUpdatedAt: profile.avatar_updated_at || null,
+        avatarKeyEnvelope: key?.envelope_ciphertext || ""
+      });
     }
 
     if (req.method === "GET" && path === "/v1/conversations") {
