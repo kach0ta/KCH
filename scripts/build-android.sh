@@ -18,7 +18,12 @@ fi
 rm -rf "$BUILD"
 mkdir -p "$BUILD/classes" "$BUILD/dex" "$OUT"
 aapt package -f -M "$ROOT/app/src/main/AndroidManifest.xml" -I "$ANDROID_JAR" -F "$BUILD/base.apk"
-javac -source 8 -target 8 -bootclasspath "$ANDROID_JAR" -d "$BUILD/classes" "$ROOT/app/src/main/java/com/kach0ta/kch/MainActivity.java"
+mapfile -d '' JAVA_FILES < <(find "$ROOT/app/src/main/java" -type f -name '*.java' -print0)
+if [ "${#JAVA_FILES[@]}" -eq 0 ]; then
+  echo "No Java source files found"
+  exit 1
+fi
+javac -source 8 -target 8 -bootclasspath "$ANDROID_JAR" -d "$BUILD/classes" "${JAVA_FILES[@]}"
 mapfile -d '' CLASS_FILES < <(find "$BUILD/classes" -type f -name '*.class' -print0)
 if [ "${#CLASS_FILES[@]}" -eq 0 ]; then
   echo "No compiled .class files found"
