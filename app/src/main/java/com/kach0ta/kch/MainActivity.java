@@ -120,7 +120,7 @@ public final class MainActivity extends Activity {
                 String encrypted=Aes256Gcm.encrypt(token,TOKEN_AAD.getBytes(StandardCharsets.UTF_8));
                 prefs.edit().putString("token_enc",encrypted).remove("token").putString("username",name.toLowerCase()).apply();
                 runOnUiThread(this::loadChats);
-            }catch(Exception e){runOnUiThread(()->showStatus(message(e)));}
+            }catch(Exception e){runOnUiThread(()->android.widget.Toast.makeText(this,message(e),android.widget.Toast.LENGTH_LONG).show());}
         });
     }
 
@@ -209,7 +209,7 @@ public final class MainActivity extends Activity {
         add(root,bottom,22);
         Button account=button("◉  МОЙ ПРОФИЛЬ",PANEL2,WHITE);
         bottom.addView(account,new LinearLayout.LayoutParams(0,dp(48),1));
-        account.setOnClickListener(v->showAccount());
+        account.setOnClickListener(v->{ io.execute(()->{try{myProfile=request("GET","/v1/me",null,sessionToken());}catch(Exception ignored){} runOnUiThread(this::showAccount);}); });
         Button settings=button("⚙  НАСТРОЙКИ",PANEL2,WHITE);
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);
         lp.leftMargin=dp(8);bottom.addView(settings,lp);
@@ -315,7 +315,6 @@ public final class MainActivity extends Activity {
         });
         Button back=button("НАЗАД К ЧАТАМ",PANEL2,WHITE);add(card,back,10);back.setOnClickListener(v->renderHome());
         footer();
-        io.execute(()->{try{JSONObject me=request("GET","/v1/me",null,sessionToken());myProfile=me;runOnUiThread(()->{if(!isFinishing())showAccount();});}catch(Exception ignored){}});
     }
 
     private void pickAvatar() {
@@ -332,7 +331,7 @@ public final class MainActivity extends Activity {
                     String b64=Base64.encodeToString(bytes,Base64.NO_WRAP);
                     JSONObject body=new JSONObject();body.put("avatar",b64);
                     JSONObject updated=request("POST","/v1/me/profile",body,sessionToken());myProfile=updated;
-                    runOnUiThread(()->showAccount());
+                    runOnUiThread(()->android.widget.Toast.makeText(this,"Фото профиля обновлено",android.widget.Toast.LENGTH_SHORT).show());
                 }catch(Exception e){runOnUiThread(()->showStatus(message(e)));}
             });
         }
