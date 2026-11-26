@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
     private void showAuth() {
         base("ЛИЧНЫЙ МЕССЕНДЖЕР");
         add(root,label("Твой уголок приватности.",23,Color.WHITE,true),8);
-        add(root,label("Войди или создай аккаунт. Имя пользователя: 3–24 символа, пароль: минимум 10 символов.",13,MUTED,false),8);
+        add(root,label("Войди или создай аккаунт. Имя пользователя: 3–24 символа, пароль: минимум 6 символов.",13,MUTED,false),8);
         username=new EditText(this); username.setSingleLine(true); username.setHint("Имя пользователя"); username.setTextColor(Color.WHITE); username.setHintTextColor(MUTED); username.setBackgroundColor(PANEL); add(root,username,18);
         password=new EditText(this); password.setSingleLine(true); password.setHint("Пароль"); password.setInputType(129); password.setTextColor(Color.WHITE); password.setHintTextColor(MUTED); password.setBackgroundColor(PANEL); add(root,password,10);
         Button login=button("ВОЙТИ",PURPLE); add(root,login,18);
@@ -68,6 +68,7 @@ public final class MainActivity extends Activity {
     private void authenticate(boolean create) {
         String name=username.getText().toString().trim(), pass=password.getText().toString();
         if(name.isEmpty()||pass.isEmpty()){ showStatus("Заполни оба поля."); return; }
+        if(pass.length()<6){ showStatus("Пароль должен содержать минимум 6 символов."); return; }
         hideKeyboard();
         JSONObject body=new JSONObject();
         try { body.put("username",name); body.put("password",pass); } catch(Exception ignored) {}
@@ -130,7 +131,19 @@ public final class MainActivity extends Activity {
     }
 
     private void showStatus(String s){if(status!=null)status.setText(s);}
-    private String message(Exception e){String m=e.getMessage();return m==null?"Не удалось связаться с сервером.":m;}
+    private String message(Exception e){
+        String m=e.getMessage();
+        if(m==null)return "Не удалось связаться с сервером.";
+        if(m.contains("username_taken"))return "Это имя пользователя уже занято.";
+        if(m.contains("invalid_credentials"))return "Неверное имя пользователя или пароль.";
+        if(m.contains("credentials_required"))return "Введи имя пользователя и пароль.";
+        if(m.contains("invalid_registration_data")||m.contains("username must be"))return "Проверь данные: имя пользователя должно содержать 3–24 символа, пароль — 6–128 символов.";
+        if(m.contains("could_not_create_account"))return "Не удалось создать аккаунт. Попробуй ещё раз.";
+        if(m.contains("unauthorized"))return "Сессия завершилась. Войди снова.";
+        String lower=m.toLowerCase();
+        if(lower.contains("unable to resolve host")||lower.contains("failed to connect")||lower.contains("timeout")||lower.contains("network is unreachable"))return "Нет соединения с сервером. Проверь интернет.";
+        return "Не удалось выполнить запрос. Попробуй ещё раз.";
+    }
     private void hideKeyboard(){try{((InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE)).hideSoftInputFromWindow(password.getWindowToken(),0);}catch(Exception ignored){}}
     private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(color==ACID?BG:Color.WHITE);b.setTextSize(13);b.setAllCaps(false);b.setBackgroundColor(color);return b;}
     private View card(String title,String sub){LinearLayout box=new LinearLayout(this);box.setOrientation(1);box.setPadding(dp(15),dp(14),dp(15),dp(14));box.setBackgroundColor(PANEL);LinearLayout.LayoutParams p=params();p.topMargin=dp(9);box.setLayoutParams(p);box.addView(label(title,16,Color.WHITE,true));add(box,label(sub,11,MUTED,false),4);return box;}
