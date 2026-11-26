@@ -100,7 +100,7 @@ See DATA_RETENTION.md for server-side deletion behavior and its limitations.
 ## Rollout order
 
 1. Freeze protocol requirements, threat model, key lifecycle, identity verification UX and versioned wire format.
-2. Validate Android Keystore key-generation/signature capabilities on the minimum supported API and add device identity storage tests.
+2. Run the Settings device-identity diagnostic on a real Android device; then validate Android Keystore key-generation/signature capabilities on the minimum supported API and add automated device identity storage tests.
 3. Specify the asynchronous handshake in detail; publish only public identity/prekey material on the server.
 4. Implement the handshake as an isolated module with deterministic test vectors, signature/tamper/replay tests and independent review.
 5. Specify and implement the per-message ratchet and crash-safe state persistence; test reordering, replay, skipped messages, restarts and key changes.
@@ -114,7 +114,8 @@ See DATA_RETENTION.md for server-side deletion behavior and its limitations.
 Implemented in this branch:
 - AES-256-GCM binary blob primitive;
 - P-256 ECDH and HKDF-SHA-256 platform primitives;
-- local P-256 ECDSA device identity key generation/signing through Android Keystore (not yet runtime-tested on a device);
+- local P-256 ECDSA device identity key generation/signing through Android Keystore;
+- a manual Settings diagnostic that checks key creation/readback, valid signature verification and rejection of a modified signature. This diagnostic must still be run on a real device; source compilation alone is not a runtime test;
 - standalone primitive self-tests, successfully run in the owner's Termux environment;
 - server-side groundwork for opaque encrypted avatar ciphertext and recipient key-envelope records;
 - data-retention documentation and legacy plaintext-avatar rejection.
