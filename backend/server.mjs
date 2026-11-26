@@ -85,7 +85,7 @@ async function readJson(req) {
   try { return JSON.parse(body || "null"); } catch { return null; }
 }
 function currentUser(req) {
-  const raw = req.headers.authorization?.replace(/^Bearer\\s+/i, "");
+  const raw = req.headers.authorization?.replace(/^Bearer\s+/i, "");
   if (!raw) return null;
   return db.prepare(`
     SELECT u.id, u.username, u.display_name
