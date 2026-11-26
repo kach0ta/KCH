@@ -8,6 +8,8 @@ Protected endpoints require `Authorization: Bearer <token>`.
 - `POST /v1/auth/login`: `{ username, password }`.
 - `GET /v1/me`: returns account metadata and the current opaque avatar ciphertext envelope, if any.
 - `POST /v1/me/profile`: updates `username` and/or `displayName`; encrypted avatar updates use `{ avatarCiphertext, avatarMime }`. To clear an avatar use `{ clearAvatar: true }`. The legacy plaintext `avatar` field is rejected.
+- `POST /v1/me/avatar-keys/:recipientId`: stores an opaque per-recipient encrypted avatar-key envelope: `{ avatarVersion, envelopeCiphertext }`. The recipient must share at least one conversation with the owner.
+- `GET /v1/users/:id/profile`: returns profile/avatar ciphertext and only the requesting user's avatar-key envelope, provided both users share a conversation.
 
 Avatar ciphertext is opaque to the server. The server does not receive the blob content key. Key delivery to authorized contacts through E2EE sessions is not implemented yet, so this endpoint alone does not make avatars fully shareable E2EE.
 
