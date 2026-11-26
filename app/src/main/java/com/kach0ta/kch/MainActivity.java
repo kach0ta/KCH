@@ -298,6 +298,39 @@ public final class MainActivity extends Activity {
         add(panel,label("Внешний вид",18,WHITE,true),2);
         add(panel,label("Тёмная тема K.C.H. с мягкими стеклянными элементами.",13,MUTED,false),8);
         add(panel,label("Уведомления и приватность появятся здесь по мере подключения функций.",12,MUTED,false),14);
+
+        add(panel,label("КРИПТОГРАФИЯ УСТРОЙСТВА",10,ACID,true),14);
+        add(panel,label("Локальная проверка Android Keystore. Никакие ключи не отправляются на сервер.",11,MUTED,false),5);
+        Button identityCheck=button("ПРОВЕРИТЬ КЛЮЧ УСТРОЙСТВА",PANEL2,WHITE);
+        add(panel,identityCheck,10);
+        TextView identityStatus=label("Проверка ещё не запускалась.",11,MUTED,false);
+        add(panel,identityStatus,8);
+        identityCheck.setOnClickListener(v->{
+            identityCheck.setEnabled(false);
+            identityStatus.setText("Проверяем Android Keystore…");
+            io.execute(()->{
+                String result;
+                try{
+                    byte[] publicKey=DeviceIdentity.getOrCreatePublicKey();
+                    byte[] challenge="KCH-DEVICE-IDENTITY-SELF-TEST-V1".getBytes(StandardCharsets.UTF_8);
+                    byte[] signature=DeviceIdentity.sign("SELF-TEST",challenge);
+                    boolean valid=DeviceIdentity.verify(publicKey,"SELF-TEST",challenge,signature);
+                    byte[] altered=signature.clone();
+                    altered[0]=(byte)(altered[0]^1);
+                    boolean tamperedAccepted=DeviceIdentity.verify(publicKey,"SELF-TEST",challenge,altered);
+                    if(!valid||tamperedAccepted)throw new GeneralSecurityException("Signature self-test failed");
+                    result="УСПЕШНО: ключ создан/прочитан, подпись проверена, изменённая подпись отклонена. Отпечаток SHA-256: "+DeviceIdentity.fingerprint(publicKey);
+                }catch(Exception e){
+                    result="ОШИБКА ПРОВЕРКИ: "+message(e);
+                }
+                final String report=result;
+                runOnUiThread(()->{
+                    identityStatus.setText(report);
+                    identityCheck.setEnabled(true);
+                });
+            });
+        });
+
         Button back=button("НАЗАД К ЧАТАМ",PURPLE,WHITE);add(panel,back,18);back.setOnClickListener(v->renderHome());
         footer();
     }
