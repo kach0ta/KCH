@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.kach0ta.kch">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.kach0ta.kch">\n    <uses-permission android:name="android.permission.INTERNET" />
     <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34" />
     <application android:allowBackup="false" android:label="K.C.H." android:theme="@android:style/Theme.Material.NoActionBar" android:usesCleartextTraffic="false">
         <activity android:name=".MainActivity" android:exported="true">
