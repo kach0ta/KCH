@@ -44,7 +44,7 @@ public final class LocalPreKeyStore {
      * Reusing a key ID with different metadata is rejected; rotation must use
      * a fresh key ID so callers cannot accidentally overwrite a live key.
      */
-    public static StoredPreKey getOrCreate(Context context, String accountId,
+    public static synchronized StoredPreKey getOrCreate(Context context, String accountId,
                                            String deviceId, String keyId,
                                            long expiresAtEpochSeconds)
             throws GeneralSecurityException {
