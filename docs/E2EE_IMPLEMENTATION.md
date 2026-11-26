@@ -61,6 +61,12 @@ A future session setup needs:
 The exact handshake transcript, key schedule, failure handling and test vectors must be specified before implementation. Never trust an uploaded prekey merely because it came from the API.
 
 
+### Device registration proof prototype
+
+`DeviceRegistrationProof.java` creates a domain-separated identity signature over a canonical, length-prefixed transcript binding protocol version, authenticated account ID, stable device ID and exact encoded identity public-key bytes. The proof is intended for a future authenticated device-registration endpoint. Its local diagnostic checks valid signatures, device-ID substitution and a foreign identity key.
+
+This is not server registration: no device ID is persisted or registered by the app yet, and the API does not yet expose device/prekey endpoints. The server must derive the account ID from the authenticated session rather than trusting a client-supplied account ID, reproduce the transcript exactly, validate P-256 key encoding and verify the signature before storing the device.
+
 ### Signed prekey bundle primitive (prototype)
 
 `SignedPreKeyBundle.java` adds an isolated building block for asynchronous session setup:
